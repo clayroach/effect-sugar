@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Build babel-plugin
+        run: |
+          cd babel-plugin
+          npm install
+          npm run build
+          npm pack
+          mv *.tgz ../
+
+      - name: Build vscode-extension
+        run: |
+          cd vscode-extension
+          pnpm install
+          pnpm run build
+          pnpm run package
+          # Pack the ts-plugin
+          cd node_modules/effect-sugar-ts-plugin
+          npm pack
+          mv *.tgz ../../../
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            effect-sugar-*.vsix
+            babel-plugin-effect-sugar-*.tgz
+            effect-sugar-ts-plugin-*.tgz
+          generate_release_notes: true
