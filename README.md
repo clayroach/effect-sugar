@@ -37,16 +37,10 @@ const program = gen {
 Download and install the VSCode extension:
 
 ```bash
-# Download the .vsix from GitHub releases
+# Download and install the .vsix from GitHub releases
 curl -LO https://github.com/clayroach/effect-sugar/releases/download/v0.1.0/effect-sugar-0.1.0.vsix
-
-# Install it
 code --install-extension effect-sugar-0.1.0.vsix
-```
-
-Or install directly:
-```bash
-code --install-extension https://github.com/clayroach/effect-sugar/releases/download/v0.1.0/effect-sugar-0.1.0.vsix
+rm effect-sugar-0.1.0.vsix  # cleanup
 ```
 
 ### Step 2: Set Up Your Project
