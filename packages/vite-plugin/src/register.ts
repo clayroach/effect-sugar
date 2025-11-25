@@ -12,7 +12,7 @@
  */
 
 import { register } from 'node:module'
-import { pathToFileURL } from 'node:url'
 
 // Register our loader hooks
-register('./loader-hooks.js', pathToFileURL(import.meta.url))
+// Note: import.meta.url is already a file:// URL, so we pass it directly
+register('./loader-hooks.js', import.meta.url)

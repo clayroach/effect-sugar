@@ -18,6 +18,10 @@
     "./transform": {
       "import": "./dist/transform.js",
       "types": "./dist/transform.d.ts"
+    },
+    "./eslint": {
+      "import": "./dist/eslint.js",
+      "types": "./dist/eslint.d.ts"
     }
   },
   "files": [
