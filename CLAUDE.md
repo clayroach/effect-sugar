@@ -216,6 +216,47 @@ grep -n "pattern" file.ts
 - Be specific about failures
 - Provide next steps
 
+## Effect MCP Server for Documentation Lookup
+
+**MANDATORY:** Before implementing any Effect-based functionality, use the Effect MCP server:
+
+### 1. Search for Effect-native patterns
+
+```
+Use mcp__effect-docs__effect_docs_search to find relevant Effect patterns
+Example queries: "layer composition", "resource management", "error handling", "generator"
+```
+
+### 2. Validate your approach
+
+```
+After finding relevant docs, use mcp__effect-docs__get_effect_doc to read full documentation
+Verify your planned approach matches Effect best practices
+```
+
+### 3. Find Effect-native alternatives
+
+Before using Promise.all(), Array.map(), etc., search Effect docs for:
+- `Effect.all()` for concurrent operations
+- `Effect.forEach()` for iteration
+- `Effect.gen()` for generator syntax
+- `Effect.tryPromise()` for wrapping promises
+
+### When to check Effect docs
+
+**ALWAYS check before:**
+- Implementing concurrent operations
+- Managing resources (files, connections)
+- Handling errors with typed errors
+- Working with async operations
+- Creating new layers or services
+
+**Example searches:**
+- "generator syntax"
+- "layer dependency injection"
+- "error handling tagged errors"
+- "concurrent effects"
+
 ## Available Agents
 
 Located in `.claude/agents/`:
