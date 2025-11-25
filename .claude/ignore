@@ -1,0 +1,30 @@
+# Claude Code ignore file
+# Files and directories Claude should not modify
+
+# Generated files
+dist/
+build/
+target/
+coverage/
+*.log
+*.vsix
+
+# Package manager files
+node_modules/
+package-lock.json
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Planning/working documents (local only)
+tmp/

@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx babel:*)",
+      "Bash(node:*)",
+      "Bash(gh:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(git log:*)",
+      "Bash(git checkout:*)",
+      "Bash(git fetch:*)",
+      "Bash(git stash:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(rg:*)",
+      "Bash(mkdir:*)",
+      "Bash(rsync:*)",
+      "Bash(echo:*)",
+      "Bash(tee:*)",
+      "WebSearch",
+      "WebFetch",
+      "WebFetch(domain:effect.website)",
+      "mcp__effect-docs__effect_docs_search",
+      "mcp__effect-docs__get_effect_doc"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

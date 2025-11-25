@@ -122,3 +122,106 @@ Example: `tmp/2025-11-24/VIRTUAL_FILE_APPROACH.md`
 - Organize by date to track planning evolution
 - Gitignored - not committed to repo
 - Reference these docs across sessions for continuity
+
+---
+
+## Development Best Practices
+
+### Avoid Over-Engineering
+
+**ONLY implement what is explicitly requested - NO speculative features:**
+
+- Implement EXACTLY what the issue/spec describes
+- Keep solutions minimal and focused
+- Ask for clarification rather than assuming requirements
+- **When in doubt**: Implement the minimum viable solution
+
+### No Time Estimates
+
+**NEVER include time estimates in implementation plans:**
+
+- Use phase-based organization (Phase 1, Phase 2, Phase 3)
+- Use priority-based labels (Immediate, Short-term, Long-term)
+- Focus on dependency relationships between tasks
+
+### Test-Before-Commit Workflow
+
+**MANDATORY for all code changes:**
+
+```bash
+# 1. Make code changes
+# 2. RUN TESTS
+npm test
+
+# 3. ONLY commit if tests pass
+git add [files]
+git commit -m "message"
+```
+
+**NEVER** commit without running tests or mark tests as "verified" without actually running them.
+
+### Git Workflow - Feature Branches
+
+**ALWAYS use feature branches:**
+
+```bash
+git checkout -b feat/feature-name
+git commit -m "feat: description"
+git push -u origin feat/feature-name
+gh pr create
+```
+
+### Multi-Line Content - Use Temporary Files
+
+**ALWAYS write multi-line content to temporary files:**
+
+```bash
+# Commits
+cat > /tmp/commit-msg.txt << 'EOF'
+feat: Brief description
+
+Detailed explanation.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+EOF
+git commit -F /tmp/commit-msg.txt
+
+# PR bodies
+cat > /tmp/pr-body.txt << 'EOF'
+## Summary
+...
+EOF
+gh pr create --title "feat: title" --body-file /tmp/pr-body.txt
+```
+
+### Bash Command Formatting
+
+**NEVER use backslash line continuations** - use single-line commands with `&&` chaining:
+
+```bash
+# CORRECT
+echo "Check" && grep -n "pattern" file.ts && echo "Done"
+
+# WRONG - causes errors
+echo "Check" && \
+grep -n "pattern" file.ts
+```
+
+### Never Declare Early Success
+
+**NEVER declare success while known issues exist:**
+
+- State what actually works (with evidence)
+- Acknowledge all known issues
+- Be specific about failures
+- Provide next steps
+
+## Available Agents
+
+Located in `.claude/agents/`:
+
+- **effect-ts-optimization-agent** - Optimize Effect-TS patterns, eliminate "as any"
+- **code-review-agent** - Quality assurance and best practices
+- **testing-agent** - Test execution and validation
+- **refactoring-specialist** - Safe code transformation
+- **dryness-agent** - Find DRY violations and duplication
