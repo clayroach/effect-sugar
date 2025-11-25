@@ -9,7 +9,7 @@
 
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { transformSource } from '../../babel-plugin/dist/index.js'
+import { transformSource } from '../../packages/babel-plugin/target/dist/index.js'
 
 describe('effect-sugar integration', () => {
   describe('transformation', () => {

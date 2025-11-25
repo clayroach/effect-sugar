@@ -7,11 +7,17 @@ Babel plugin providing syntactic sugar for Effect-TS with for-comprehension styl
 **IMPORTANT: Always use pnpm, never npm**
 
 ```bash
-# Build everything
+# Build everything (uses Turborepo)
 pnpm run build
 
-# Run unit tests (babel-plugin)
-pnpm run test:plugin
+# Run all package tests
+pnpm run test
+
+# Run babel-plugin tests only
+pnpm --filter babel-plugin-effect-sugar test
+
+# Run vite-plugin tests only
+pnpm --filter effect-sugar-vite test
 
 # Run integration tests
 pnpm run test:integration
@@ -19,11 +25,11 @@ pnpm run test:integration
 # Clean build artifacts
 pnpm run clean
 
-# Build vite-plugin
-cd packages/vite-plugin && pnpm run build
+# Typecheck all packages
+pnpm run typecheck
 
-# Test vite-plugin
-cd packages/vite-plugin && pnpm test
+# Create a changeset for versioning
+pnpm changeset
 ```
 
 ## Package Structure
@@ -31,25 +37,27 @@ cd packages/vite-plugin && pnpm test
 ```
 effect-sugar/
 ├── packages/
-│   └── vite-plugin/        # Vite plugin + tsx loader (effect-sugar-vite)
-│       ├── src/
-│       │   ├── index.ts    # Vite plugin entry point
-│       │   ├── transform.ts # Core transformation logic
-│       │   ├── register.ts # tsx loader registration
-│       │   └── loader-hooks.ts # Node.js loader hooks
-│       └── test/           # Unit tests
-├── babel-plugin/           # Core transformation plugin
-│   ├── src/
-│   │   ├── parser.ts       # Custom syntax parser for gen { }
-│   │   ├── generator.ts    # Code generator for Effect.gen
-│   │   └── index.ts        # Plugin entry point
-│   └── test/               # Unit tests
-├── vscode-extension/       # VSCode extension with TypeScript plugin
+│   ├── babel-plugin/       # Core transformation plugin (babel-plugin-effect-sugar)
+│   │   ├── src/
+│   │   │   ├── parser.ts       # Custom syntax parser for gen { }
+│   │   │   ├── generator.ts    # Code generator for Effect.gen
+│   │   │   └── index.ts        # Plugin entry point
+│   │   └── test/               # Unit tests
+│   ├── vite-plugin/        # Vite plugin + tsx loader (effect-sugar-vite)
+│   │   ├── src/
+│   │   │   ├── index.ts    # Vite plugin entry point
+│   │   │   ├── transform.ts # Core transformation logic
+│   │   │   ├── register.ts # tsx loader registration
+│   │   │   └── loader-hooks.ts # Node.js loader hooks
+│   │   └── test/           # Unit tests
+│   └── vscode-extension/   # VSCode extension with TypeScript plugin
 ├── test/
 │   └── integration/        # Integration tests with Effect-TS
 ├── examples/               # Usage examples (.gen.ts files)
 ├── scripts/
 │   └── preprocess.js       # Transforms gen blocks before TypeScript
+├── turbo.json              # Turborepo configuration
+├── pnpm-workspace.yaml     # pnpm workspace configuration
 └── target/                 # Build outputs
 ```
 

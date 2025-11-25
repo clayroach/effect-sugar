@@ -3,16 +3,19 @@
   "version": "0.1.0",
   "description": "Babel plugin for Effect-TS syntactic sugar with for-comprehension and <- operator",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./target/dist/index.js",
+  "types": "./target/dist/index.d.ts",
   "sideEffects": false,
   "files": [
-    "dist"
+    "target/dist"
   ],
   "scripts": {
     "build": "tsc",
-    "test": "vitest",
-    "test:watch": "vitest --watch"
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf target/dist"
   },
   "keywords": [
     "babel-plugin",
@@ -33,6 +36,11 @@
     "@types/babel__core": "^7.20.0",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clayroach/effect-sugar.git",
+    "directory": "packages/babel-plugin"
   },
   "license": "MIT"
 }

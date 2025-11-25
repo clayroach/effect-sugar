@@ -9,3 +9,6 @@ tmp/
 
 # Dependencies
 node_modules/
+
+# Turborepo
+.turbo/
