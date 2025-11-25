@@ -1,6 +1,6 @@
 {
   "name": "effect-sugar-vite",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Vite plugin for Effect-TS gen block syntax",
   "type": "module",
   "main": "./dist/index.js",
@@ -29,7 +29,8 @@
     "test:watch": "vitest",
     "clean": "rm -rf dist",
     "preinstall": "npx only-allow pnpm",
-    "publish:local": "npm version --no-git-tag-version \"0.0.0-dev.$(date +%Y%m%d%H%M%S).$(git rev-parse --short HEAD)\" && pnpm publish --registry http://localhost:4873 --no-git-checks"
+    "version:local": "npm version --no-git-tag-version \"$(node -p \"require('./package.json').version.split('-')[0]\")-dev.$(date +%Y%m%d%H%M%S).$(git rev-parse --short HEAD)\"",
+    "publish:local": "pnpm version:local && pnpm publish --registry http://localhost:4873 --no-git-checks && git checkout package.json"
   },
   "packageManager": "pnpm@8.15.0",
   "peerDependencies": {
