@@ -1,0 +1,31 @@
+{
+  "name": "effect-sugar",
+  "version": "0.1.0",
+  "description": "Effect-TS syntactic sugar with for-comprehension style gen blocks",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build:plugin": "cd babel-plugin && npm run build",
+    "preprocess": "node scripts/preprocess.js examples",
+    "format": "node scripts/format-gen.js examples",
+    "build:tsc": "tsc -p tsconfig.build.json",
+    "build": "npm run build:plugin && npm run preprocess && npm run build:tsc",
+    "test:plugin": "cd babel-plugin && npm test",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test": "npm run test:plugin && npm run test:integration",
+    "clean": "rm -rf target dist"
+  },
+  "dependencies": {
+    "effect": "^3.0.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.23.0",
+    "@babel/core": "^7.23.0",
+    "@babel/preset-typescript": "^7.23.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "license": "MIT"
+}

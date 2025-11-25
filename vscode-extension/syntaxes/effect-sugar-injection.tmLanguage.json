@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Effect Sugar Injection",
+  "scopeName": "effect-sugar.injection",
+  "injectionSelector": "L:source.ts, L:source.tsx",
+  "patterns": [
+    { "include": "#gen-block" }
+  ],
+  "repository": {
+    "gen-block": {
+      "begin": "\\b(gen)\\s*(\\{)",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.effect-sugar" },
+        "2": { "name": "punctuation.definition.block.effect-sugar" }
+      },
+      "end": "(\\})(?=\\s*;|\\s*$|\\s*\\)|\\s*,)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.block.effect-sugar" }
+      },
+      "name": "meta.block.gen.effect-sugar",
+      "patterns": [
+        { "include": "#bind-statement" },
+        { "include": "#let-statement" },
+        { "include": "source.ts" }
+      ]
+    },
+    "bind-statement": {
+      "match": "^(\\s*)([a-zA-Z_][a-zA-Z0-9_]*)\\s*(<-)\\s*",
+      "captures": {
+        "2": { "name": "variable.other.effect-sugar" },
+        "3": { "name": "keyword.operator.bind.effect-sugar" }
+      }
+    },
+    "let-statement": {
+      "match": "^(\\s*)(let)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(=)",
+      "captures": {
+        "2": { "name": "keyword.other.let.effect-sugar" },
+        "3": { "name": "variable.other.effect-sugar" },
+        "4": { "name": "keyword.operator.assignment.effect-sugar" }
+      }
+    }
+  }
+}

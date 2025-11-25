@@ -1,0 +1,67 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Effect Sugar TypeScript",
+  "scopeName": "source.ts.effect-sugar",
+  "patterns": [
+    { "include": "#gen-block" },
+    { "include": "source.ts" }
+  ],
+  "repository": {
+    "gen-block": {
+      "begin": "\\b(gen)\\s*(\\{)",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.effect-sugar" },
+        "2": { "name": "punctuation.definition.block.effect-sugar" }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.block.effect-sugar" }
+      },
+      "name": "meta.block.gen.effect-sugar",
+      "patterns": [
+        { "include": "#bind-statement" },
+        { "include": "#let-statement" },
+        { "include": "#return-statement" },
+        { "include": "#if-statement" },
+        { "include": "#comments" },
+        { "include": "source.ts" }
+      ]
+    },
+    "bind-statement": {
+      "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(<-)\\s*",
+      "captures": {
+        "1": { "name": "variable.other.effect-sugar" },
+        "2": { "name": "keyword.operator.bind.effect-sugar" }
+      }
+    },
+    "let-statement": {
+      "match": "\\b(let)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(=)",
+      "captures": {
+        "1": { "name": "keyword.other.let.effect-sugar" },
+        "2": { "name": "variable.other.effect-sugar" },
+        "3": { "name": "keyword.operator.assignment.effect-sugar" }
+      }
+    },
+    "return-statement": {
+      "match": "\\b(return)\\b",
+      "name": "keyword.control.return.effect-sugar"
+    },
+    "if-statement": {
+      "match": "\\b(if|else)\\b",
+      "name": "keyword.control.conditional.effect-sugar"
+    },
+    "comments": {
+      "patterns": [
+        {
+          "match": "//.*$",
+          "name": "comment.line.double-slash.effect-sugar"
+        },
+        {
+          "begin": "/\\*",
+          "end": "\\*/",
+          "name": "comment.block.effect-sugar"
+        }
+      ]
+    }
+  }
+}

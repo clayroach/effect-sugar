@@ -1,0 +1,90 @@
+{
+  "name": "effect-sugar",
+  "displayName": "Effect Sugar",
+  "description": "Syntax highlighting and TypeScript support for Effect-TS gen blocks",
+  "version": "0.1.0",
+  "publisher": "atrim",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clayroach/effect-sugar"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact"
+  ],
+  "main": "./target/src/extension.js",
+  "typescriptServerPlugins": [
+    {
+      "name": "effect-sugar-ts-plugin",
+      "enableForWorkspaceTypeScriptVersions": true
+    }
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "effect-sugar-typescript",
+        "aliases": [
+          "Effect Sugar TypeScript"
+        ],
+        "extensions": [
+          ".gen.ts"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "effect-sugar-typescript",
+        "scopeName": "source.ts.effect-sugar",
+        "path": "./syntaxes/effect-sugar.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.typescript": "typescript"
+        }
+      },
+      {
+        "scopeName": "effect-sugar.injection",
+        "path": "./syntaxes/effect-sugar-injection.tmLanguage.json",
+        "injectTo": [
+          "source.ts",
+          "source.tsx"
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "Effect Sugar",
+      "properties": {
+        "effectSugar.suppressDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Suppress TypeScript diagnostics inside gen blocks"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./ && pnpm run postcompile",
+    "postcompile": "mkdir -p node_modules/effect-sugar-ts-plugin && cp -r target/ts-plugin/* node_modules/effect-sugar-ts-plugin/ && cp ts-plugin/package.json node_modules/effect-sugar-ts-plugin/ && mkdir -p ../examples/node_modules && rm -rf ../examples/node_modules/effect-sugar-ts-plugin && cp -r node_modules/effect-sugar-ts-plugin ../examples/node_modules/",
+    "build": "pnpm run compile",
+    "watch": "tsc -watch -p ./",
+    "clean": "rm -rf target node_modules/effect-sugar-ts-plugin ../examples/node_modules/effect-sugar-ts-plugin",
+    "vscode:prepublish": "pnpm run compile",
+    "package": "vsce package --out ../target/ --no-dependencies",
+    "install": "code --install-extension ../target/effect-sugar-0.1.0.vsix"
+  },
+  "dependencies": {
+    "magic-string": "^0.30.21",
+    "prettier": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.3.0"
+  }
+}
