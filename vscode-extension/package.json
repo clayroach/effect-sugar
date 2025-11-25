@@ -74,8 +74,8 @@
     "watch": "tsc -watch -p ./",
     "clean": "rm -rf target node_modules/effect-sugar-ts-plugin ../examples/node_modules/effect-sugar-ts-plugin",
     "vscode:prepublish": "pnpm run compile",
-    "package": "vsce package --out ../target/ --no-dependencies",
-    "install": "code --install-extension ../target/effect-sugar-0.1.0.vsix"
+    "package": "mkdir -p ../target && vsce package --out ../target/ --no-dependencies",
+    "install-extension": "code --install-extension ../target/effect-sugar-0.1.0.vsix"
   },
   "dependencies": {
     "magic-string": "^0.30.21",
