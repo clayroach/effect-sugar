@@ -131,8 +131,8 @@ Note: The tsx loader uses esbuild internally to compile TypeScript files that co
 For projects that can't use Vite or tsx loader:
 
 ```bash
-# Install babel plugin from GitHub releases
-pnpm add -D https://github.com/clayroach/effect-sugar/releases/download/v0.1.0/babel-plugin-effect-sugar-0.1.0.tgz
+# Install transform package from GitHub releases
+pnpm add -D https://github.com/clayroach/effect-sugar/releases/download/v0.1.0/effect-sugar-transform-0.1.0.tgz
 
 # Download the preprocessor script
 mkdir -p scripts
@@ -204,9 +204,10 @@ node target/src_managed/example.js
 
 ## Project Structure
 
+- `packages/transform/` - Core source transformer (`effect-sugar-transform`)
 - `packages/vite-plugin/` - Vite plugin and tsx loader (`effect-sugar-vite`)
-- `babel-plugin/` - Core transformation plugin (legacy)
-- `vscode-extension/` - VSCode extension with TypeScript plugin
+- `packages/ts-plugin/` - TypeScript language service plugin (`effect-sugar-ts-plugin`)
+- `packages/vscode-extension/` - VSCode extension (bundles ts-plugin)
 - `examples/` - Usage examples
 - `test/` - Integration tests
 - `scripts/` - Build scripts
@@ -236,20 +237,23 @@ Transformed files are written to `target/src_managed/`. Point your TypeScript bu
 **Note: Always use pnpm, never npm**
 
 ```bash
-# Build everything
+# Build everything (uses Turborepo)
 pnpm run build
 
-# Run tests
+# Run all package tests
 pnpm test
+
+# Run integration tests
+pnpm test:integration
 
 # Clean build artifacts
 pnpm run clean
 
-# Build vite-plugin
-cd packages/vite-plugin && pnpm run build
+# Typecheck all packages
+pnpm run typecheck
 
-# Test vite-plugin
-cd packages/vite-plugin && pnpm test
+# Publish to local Verdaccio for testing
+pnpm publish:dev
 ```
 
 ## Status
