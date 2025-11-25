@@ -4,24 +4,40 @@ Babel plugin providing syntactic sugar for Effect-TS with for-comprehension styl
 
 ## Quick Commands
 
+**IMPORTANT: Always use pnpm, never npm**
+
 ```bash
 # Build everything
-npm run build
+pnpm run build
 
 # Run unit tests (babel-plugin)
-npm run test:plugin
+pnpm run test:plugin
 
 # Run integration tests
-npm run test:integration
+pnpm run test:integration
 
 # Clean build artifacts
-npm run clean
+pnpm run clean
+
+# Build vite-plugin
+cd packages/vite-plugin && pnpm run build
+
+# Test vite-plugin
+cd packages/vite-plugin && pnpm test
 ```
 
 ## Package Structure
 
 ```
 effect-sugar/
+├── packages/
+│   └── vite-plugin/        # Vite plugin + tsx loader (effect-sugar-vite)
+│       ├── src/
+│       │   ├── index.ts    # Vite plugin entry point
+│       │   ├── transform.ts # Core transformation logic
+│       │   ├── register.ts # tsx loader registration
+│       │   └── loader-hooks.ts # Node.js loader hooks
+│       └── test/           # Unit tests
 ├── babel-plugin/           # Core transformation plugin
 │   ├── src/
 │   │   ├── parser.ts       # Custom syntax parser for gen { }
@@ -58,6 +74,51 @@ const program = Effect.gen(function* () {
 ```
 
 ## Build Pipeline
+
+There are multiple integration options depending on your project setup:
+
+### Option A: Vite Plugin (Frontend)
+
+For Vite-based projects (React, Vue, etc.):
+
+```typescript
+// vite.config.ts
+import effectSugar from 'effect-sugar-vite'
+
+export default defineConfig({
+  plugins: [
+    effectSugar(),  // Add BEFORE other plugins like react()
+    react()
+  ]
+})
+```
+
+**Flow:** `.ts` files → Vite plugin transforms `gen { }` → esbuild compiles → bundled output
+
+### Option B: tsx Loader (Backend/Node.js)
+
+For backend development with tsx:
+
+```bash
+pnpm add -D effect-sugar-vite esbuild
+```
+
+```json
+// package.json
+{
+  "scripts": {
+    "dev": "tsx --import effect-sugar-vite/register --watch src/index.ts"
+  }
+}
+```
+
+**Flow:** `.ts` files → loader reads source → transforms `gen { }` → esbuild compiles → Node.js executes
+
+Note: esbuild is required because the loader bypasses tsx for files with gen blocks.
+
+### Option C: Preprocessor Script (Legacy)
+
+For projects that can't use Vite or tsx loader:
 
 ```
 .gen.ts files → preprocess.js → .ts files → TypeScript → .js + .d.ts
@@ -104,8 +165,9 @@ Use `.gen.ts` for files with gen block syntax. The preprocessing step outputs st
 ## Current Status
 
 - **Phase 1**: Complete (parser, generator, unit tests)
-- **Phase 2**: In Progress (TypeScript integration)
-- **Phase 3-5**: Not started (VSCode extension, CLI, IntelliJ)
+- **Phase 2**: Complete (TypeScript integration, VSCode extension)
+- **Phase 3**: Complete (Vite plugin + tsx loader - `effect-sugar-vite`)
+- **Phase 4-5**: Not started (CLI, IntelliJ)
 
 See GitHub Issues for specifications and roadmap.
 
@@ -151,7 +213,7 @@ Example: `tmp/2025-11-24/VIRTUAL_FILE_APPROACH.md`
 ```bash
 # 1. Make code changes
 # 2. RUN TESTS
-npm test
+pnpm test
 
 # 3. ONLY commit if tests pass
 git add [files]

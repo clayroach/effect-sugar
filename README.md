@@ -83,9 +83,52 @@ Add the TypeScript plugin to your `tsconfig.json`:
 
 The `gen { }` syntax needs to be transformed to `Effect.gen()` before TypeScript compiles.
 
-#### Option A: Use the Preprocessor Script
+#### Option A: Vite Plugin (Recommended for Frontend)
 
-Install the babel plugin and set up the preprocessor:
+For projects using Vite:
+
+```bash
+pnpm add -D effect-sugar-vite
+```
+
+Add to your `vite.config.ts`:
+
+```typescript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import effectSugar from 'effect-sugar-vite'
+
+export default defineConfig({
+  plugins: [
+    effectSugar(),  // Add BEFORE other plugins
+    react()
+  ]
+})
+```
+
+#### Option B: tsx Loader (Recommended for Backend/Node.js)
+
+For backend development with tsx:
+
+```bash
+pnpm add -D effect-sugar-vite esbuild
+```
+
+Update your dev script in `package.json`:
+
+```json
+{
+  "scripts": {
+    "dev": "tsx --import effect-sugar-vite/register --watch src/index.ts"
+  }
+}
+```
+
+Note: The tsx loader uses esbuild internally to compile TypeScript files that contain gen blocks.
+
+#### Option C: Preprocessor Script (Legacy)
+
+For projects that can't use Vite or tsx loader:
 
 ```bash
 # Install babel plugin from GitHub releases
@@ -102,7 +145,7 @@ Add a build script to your `package.json`:
 {
   "scripts": {
     "preprocess": "node scripts/preprocess.js src",
-    "build": "npm run preprocess && tsc -p tsconfig.build.json"
+    "build": "pnpm run preprocess && tsc -p tsconfig.build.json"
   }
 }
 ```
@@ -145,7 +188,7 @@ Effect.runPromise(program).then(console.log)
 
 ```bash
 # Transform gen blocks and compile
-npm run build
+pnpm run build
 
 # Run the compiled output
 node target/src_managed/example.js
@@ -161,7 +204,8 @@ node target/src_managed/example.js
 
 ## Project Structure
 
-- `babel-plugin/` - Core transformation plugin
+- `packages/vite-plugin/` - Vite plugin and tsx loader (`effect-sugar-vite`)
+- `babel-plugin/` - Core transformation plugin (legacy)
 - `vscode-extension/` - VSCode extension with TypeScript plugin
 - `examples/` - Usage examples
 - `test/` - Integration tests
@@ -189,22 +233,31 @@ Transformed files are written to `target/src_managed/`. Point your TypeScript bu
 
 ## Development
 
+**Note: Always use pnpm, never npm**
+
 ```bash
 # Build everything
-npm run build
+pnpm run build
 
 # Run tests
-npm test
+pnpm test
 
 # Clean build artifacts
-npm run clean
+pnpm run clean
+
+# Build vite-plugin
+cd packages/vite-plugin && pnpm run build
+
+# Test vite-plugin
+cd packages/vite-plugin && pnpm test
 ```
 
 ## Status
 
 - **Phase 1**: Complete (parser, generator, unit tests)
-- **Phase 2**: In Progress (TypeScript integration)
-- **Phase 3-5**: Not started (CLI, IntelliJ)
+- **Phase 2**: Complete (TypeScript integration, VSCode extension)
+- **Phase 3**: Complete (Vite plugin + tsx loader)
+- **Phase 4-5**: Not started (CLI, IntelliJ)
 
 ## License
 
