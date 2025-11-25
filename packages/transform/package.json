@@ -1,7 +1,7 @@
 {
-  "name": "babel-plugin-effect-sugar",
+  "name": "effect-sugar-transform",
   "version": "0.1.0",
-  "description": "Babel plugin for Effect-TS syntactic sugar with for-comprehension and <- operator",
+  "description": "Source transformer for Effect-TS gen block syntax",
   "type": "module",
   "main": "./target/dist/index.js",
   "types": "./target/dist/index.d.ts",
@@ -18,11 +18,13 @@
     "clean": "rm -rf target/dist"
   },
   "keywords": [
-    "babel-plugin",
     "effect-ts",
+    "effect",
+    "transform",
     "functional-programming",
     "monads",
-    "for-comprehension"
+    "for-comprehension",
+    "gen-blocks"
   ],
   "peerDependencies": {
     "@babel/core": "^7.0.0"
@@ -40,7 +42,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/clayroach/effect-sugar.git",
-    "directory": "packages/babel-plugin"
+    "directory": "packages/transform"
   },
   "license": "MIT"
 }

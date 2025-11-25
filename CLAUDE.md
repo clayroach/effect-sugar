@@ -1,6 +1,6 @@
 # effect-sugar - AI Context
 
-Babel plugin providing syntactic sugar for Effect-TS with for-comprehension style `gen` blocks.
+Source transformer and tooling for Effect-TS with for-comprehension style `gen` blocks.
 
 ## Quick Commands
 
@@ -13,8 +13,8 @@ pnpm run build
 # Run all package tests
 pnpm run test
 
-# Run babel-plugin tests only
-pnpm --filter babel-plugin-effect-sugar test
+# Run transform tests only
+pnpm --filter effect-sugar-transform test
 
 # Run vite-plugin tests only
 pnpm --filter effect-sugar-vite test
@@ -37,11 +37,11 @@ pnpm changeset
 ```
 effect-sugar/
 ├── packages/
-│   ├── babel-plugin/       # Core transformation plugin (babel-plugin-effect-sugar)
+│   ├── transform/          # Core source transformer (effect-sugar-transform)
 │   │   ├── src/
 │   │   │   ├── parser.ts       # Custom syntax parser for gen { }
 │   │   │   ├── generator.ts    # Code generator for Effect.gen
-│   │   │   └── index.ts        # Plugin entry point
+│   │   │   └── index.ts        # Entry point
 │   │   └── test/               # Unit tests
 │   ├── vite-plugin/        # Vite plugin + tsx loader (effect-sugar-vite)
 │   │   ├── src/
@@ -50,7 +50,9 @@ effect-sugar/
 │   │   │   ├── register.ts # tsx loader registration
 │   │   │   └── loader-hooks.ts # Node.js loader hooks
 │   │   └── test/           # Unit tests
-│   └── vscode-extension/   # VSCode extension with TypeScript plugin
+│   ├── ts-plugin/          # TypeScript language service plugin (effect-sugar-ts-plugin)
+│   │   └── src/            # Plugin source files
+│   └── vscode-extension/   # VSCode extension (bundles ts-plugin)
 ├── test/
 │   └── integration/        # Integration tests with Effect-TS
 ├── examples/               # Usage examples (.gen.ts files)
@@ -167,7 +169,7 @@ Use `.gen.ts` for files with gen block syntax. The preprocessing step outputs st
 
 ## Testing
 
-- **Unit tests**: Test parser and generator in isolation (`babel-plugin/test/`)
+- **Unit tests**: Test parser and generator in isolation (`packages/transform/test/`)
 - **Integration tests**: Test full pipeline with Effect-TS (`test/integration/`)
 
 ## Current Status

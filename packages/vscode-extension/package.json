@@ -69,16 +69,16 @@
   },
   "scripts": {
     "build": "tsc -p ./ && pnpm run postcompile",
-    "postcompile": "mkdir -p node_modules/effect-sugar-ts-plugin && cp -r target/ts-plugin/* node_modules/effect-sugar-ts-plugin/ && cp ts-plugin/package.json node_modules/effect-sugar-ts-plugin/ && mkdir -p ../../examples/node_modules && rm -rf ../../examples/node_modules/effect-sugar-ts-plugin && cp -r node_modules/effect-sugar-ts-plugin ../../examples/node_modules/",
+    "postcompile": "mkdir -p ../../examples/node_modules && rm -rf ../../examples/node_modules/effect-sugar-ts-plugin && cp -r node_modules/effect-sugar-ts-plugin ../../examples/node_modules/",
     "dev": "tsc -watch -p ./",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf target node_modules/effect-sugar-ts-plugin ../../examples/node_modules/effect-sugar-ts-plugin",
+    "clean": "rm -rf target ../../examples/node_modules/effect-sugar-ts-plugin",
     "vscode:prepublish": "pnpm run build",
     "package": "mkdir -p ../../target && vsce package --out ../../target/ --no-dependencies",
     "install-extension": "code --install-extension ../../target/effect-sugar-0.1.0.vsix"
   },
   "dependencies": {
-    "magic-string": "^0.30.21",
+    "effect-sugar-ts-plugin": "workspace:*",
     "prettier": "^3.0.0"
   },
   "devDependencies": {

@@ -24,7 +24,7 @@ importers:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.25)
 
-  packages/babel-plugin:
+  packages/transform:
     devDependencies:
       '@babel/core':
         specifier: ^7.23.0
@@ -51,6 +51,19 @@ importers:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.25)
 
+  packages/ts-plugin:
+    dependencies:
+      magic-string:
+        specifier: ^0.30.5
+        version: 0.30.21
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.25
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
   packages/vite-plugin:
     dependencies:
       magic-string:
@@ -75,9 +88,9 @@ importers:
 
   packages/vscode-extension:
     dependencies:
-      magic-string:
-        specifier: ^0.30.21
-        version: 0.30.21
+      effect-sugar-ts-plugin:
+        specifier: workspace:*
+        version: link:../ts-plugin
       prettier:
         specifier: ^3.0.0
         version: 3.6.2

@@ -1,0 +1,41 @@
+{
+  "name": "effect-sugar-ts-plugin",
+  "version": "0.1.0",
+  "description": "TypeScript language service plugin for Effect-TS gen block syntax",
+  "main": "./target/dist/index.js",
+  "types": "./target/dist/index.d.ts",
+  "files": [
+    "target/dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf target/dist"
+  },
+  "keywords": [
+    "typescript",
+    "plugin",
+    "effect-ts",
+    "effect",
+    "effect-sugar",
+    "gen-blocks",
+    "language-service"
+  ],
+  "peerDependencies": {
+    "typescript": ">=4.9.0"
+  },
+  "dependencies": {
+    "magic-string": "^0.30.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clayroach/effect-sugar.git",
+    "directory": "packages/ts-plugin"
+  },
+  "license": "MIT"
+}
