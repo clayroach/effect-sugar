@@ -3,40 +3,40 @@
   "version": "0.1.2",
   "description": "Vite plugin for Effect-TS gen block syntax",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./target/dist/index.js",
+  "module": "./target/dist/index.js",
+  "types": "./target/dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./target/dist/index.js",
+      "types": "./target/dist/index.d.ts"
     },
     "./register": {
-      "import": "./dist/register.js",
-      "types": "./dist/register.d.ts"
+      "import": "./target/dist/register.js",
+      "types": "./target/dist/register.d.ts"
     },
     "./transform": {
-      "import": "./dist/transform.js",
-      "types": "./dist/transform.d.ts"
+      "import": "./target/dist/transform.js",
+      "types": "./target/dist/transform.d.ts"
     },
     "./eslint": {
-      "import": "./dist/eslint.js",
-      "types": "./dist/eslint.d.ts"
+      "import": "./target/dist/eslint.js",
+      "types": "./target/dist/eslint.d.ts"
     }
   },
   "files": [
-    "dist"
+    "target/dist"
   ],
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "clean": "rm -rf dist",
-    "preinstall": "npx only-allow pnpm",
-    "version:local": "npm version --no-git-tag-version \"$(node -p \"require('./package.json').version.split('-')[0]\")-dev.$(date +%Y%m%d%H%M%S).$(git rev-parse --short HEAD)\"",
-    "publish:local": "pnpm version:local && pnpm publish --registry http://localhost:4873 --no-git-checks && git checkout package.json"
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf target/dist",
+    "version:dev": "npm version --no-git-tag-version \"$(node -p \"require('./package.json').version.split('-')[0]\")-dev.$(date +%Y%m%d).$(git rev-parse --short HEAD)\"",
+    "publish:dev": "pnpm build && pnpm version:dev && pnpm publish --registry http://localhost:4873 --no-git-checks && git checkout package.json"
   },
-  "packageManager": "pnpm@8.15.0",
   "peerDependencies": {
     "esbuild": ">=0.17.0",
     "vite": ">=4.0.0"
@@ -71,7 +71,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/croach/effect-sugar.git",
+    "url": "https://github.com/clayroach/effect-sugar.git",
     "directory": "packages/vite-plugin"
   }
 }

@@ -1,17 +1,23 @@
 # effect-sugar - AI Context
 
-Babel plugin providing syntactic sugar for Effect-TS with for-comprehension style `gen` blocks.
+Source transformer and tooling for Effect-TS with for-comprehension style `gen` blocks.
 
 ## Quick Commands
 
 **IMPORTANT: Always use pnpm, never npm**
 
 ```bash
-# Build everything
+# Build everything (uses Turborepo)
 pnpm run build
 
-# Run unit tests (babel-plugin)
-pnpm run test:plugin
+# Run all package tests
+pnpm run test
+
+# Run transform tests only
+pnpm --filter effect-sugar-transform test
+
+# Run vite-plugin tests only
+pnpm --filter effect-sugar-vite test
 
 # Run integration tests
 pnpm run test:integration
@@ -19,11 +25,11 @@ pnpm run test:integration
 # Clean build artifacts
 pnpm run clean
 
-# Build vite-plugin
-cd packages/vite-plugin && pnpm run build
+# Typecheck all packages
+pnpm run typecheck
 
-# Test vite-plugin
-cd packages/vite-plugin && pnpm test
+# Create a changeset for versioning
+pnpm changeset
 ```
 
 ## Package Structure
@@ -31,25 +37,29 @@ cd packages/vite-plugin && pnpm test
 ```
 effect-sugar/
 ├── packages/
-│   └── vite-plugin/        # Vite plugin + tsx loader (effect-sugar-vite)
-│       ├── src/
-│       │   ├── index.ts    # Vite plugin entry point
-│       │   ├── transform.ts # Core transformation logic
-│       │   ├── register.ts # tsx loader registration
-│       │   └── loader-hooks.ts # Node.js loader hooks
-│       └── test/           # Unit tests
-├── babel-plugin/           # Core transformation plugin
-│   ├── src/
-│   │   ├── parser.ts       # Custom syntax parser for gen { }
-│   │   ├── generator.ts    # Code generator for Effect.gen
-│   │   └── index.ts        # Plugin entry point
-│   └── test/               # Unit tests
-├── vscode-extension/       # VSCode extension with TypeScript plugin
+│   ├── transform/          # Core source transformer (effect-sugar-transform)
+│   │   ├── src/
+│   │   │   ├── parser.ts       # Custom syntax parser for gen { }
+│   │   │   ├── generator.ts    # Code generator for Effect.gen
+│   │   │   └── index.ts        # Entry point
+│   │   └── test/               # Unit tests
+│   ├── vite-plugin/        # Vite plugin + tsx loader (effect-sugar-vite)
+│   │   ├── src/
+│   │   │   ├── index.ts    # Vite plugin entry point
+│   │   │   ├── transform.ts # Core transformation logic
+│   │   │   ├── register.ts # tsx loader registration
+│   │   │   └── loader-hooks.ts # Node.js loader hooks
+│   │   └── test/           # Unit tests
+│   ├── ts-plugin/          # TypeScript language service plugin (effect-sugar-ts-plugin)
+│   │   └── src/            # Plugin source files
+│   └── vscode-extension/   # VSCode extension (bundles ts-plugin)
 ├── test/
 │   └── integration/        # Integration tests with Effect-TS
 ├── examples/               # Usage examples (.gen.ts files)
 ├── scripts/
 │   └── preprocess.js       # Transforms gen blocks before TypeScript
+├── turbo.json              # Turborepo configuration
+├── pnpm-workspace.yaml     # pnpm workspace configuration
 └── target/                 # Build outputs
 ```
 
@@ -159,7 +169,7 @@ Use `.gen.ts` for files with gen block syntax. The preprocessing step outputs st
 
 ## Testing
 
-- **Unit tests**: Test parser and generator in isolation (`babel-plugin/test/`)
+- **Unit tests**: Test parser and generator in isolation (`packages/transform/test/`)
 - **Integration tests**: Test full pipeline with Effect-TS (`test/integration/`)
 
 ## Current Status

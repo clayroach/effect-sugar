@@ -8,7 +8,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'fs'
 import { dirname, join, relative } from 'path'
-import { transformSource } from '../babel-plugin/dist/index.js'
+import { transformSource } from '../packages/transform/target/dist/index.js'
 
 const args = process.argv.slice(2)
 
