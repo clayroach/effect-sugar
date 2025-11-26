@@ -256,17 +256,14 @@ export { program }
 })
 
 describe('edge cases', () => {
-  it('handles gen keyword in strings (known limitation)', () => {
-    // KNOWN LIMITATION: gen { } inside strings will still be transformed
-    // This is acceptable because:
-    // 1. It's rare to have literal "gen { }" in strings
-    // 2. The transformation is idempotent and won't break valid code
+  it('correctly ignores gen keyword in strings (fixed with js-tokens)', () => {
+    // With js-tokens scanner, gen {} inside strings is correctly ignored
+    // This was a limitation of the old regex-based approach
     const source = 'const msg = "use gen { } for effects"'
     const result = transformSource(source)
 
-    // The regex-based detection finds "gen {" even in strings
-    // This is a trade-off for simplicity
-    expect(result.hasChanges).toBe(true)
+    // js-tokens correctly identifies this as a string, not a gen block
+    expect(result.hasChanges).toBe(false)
   })
 
   it('handles arrow functions in let statements', () => {
