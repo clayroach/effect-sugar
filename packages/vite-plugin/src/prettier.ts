@@ -6,20 +6,13 @@
  *
  * Usage:
  *
- * Option 1: As Prettier plugin (prettier.config.js)
- * ```javascript
- * export default {
- *   plugins: ['effect-sugar-vite/prettier']
- * }
- * ```
- *
- * Option 2: Programmatic API
+ * Option 1: Programmatic API
  * ```typescript
  * import { formatWithEffectSugar } from 'effect-sugar-vite/prettier'
- * const formatted = await formatWithEffectSugar(source, { filepath: 'file.ts' })
+ * const formatted = Effect.runPromise(formatWithEffectSugar(source, { filepath: 'file.ts' }))
  * ```
  *
- * Option 3: Use with lint-staged (package.json)
+ * Option 2: Use with lint-staged (package.json)
  * ```json
  * {
  *   "lint-staged": {
@@ -29,7 +22,8 @@
  * ```
  */
 
-import { transformSource, hasGenBlocks, findGenBlocks } from './transform.js'
+import { Effect } from 'effect'
+import { transformSource, hasGenBlocks } from './transform.js'
 
 // ============================================================================
 // Reverse Transformation: Effect.gen() → gen {}
@@ -41,20 +35,29 @@ interface EffectGenBlock {
   bodyContent: string
 }
 
-/**
- * Check if source contains Effect.gen patterns
- */
-export function hasEffectGen(source: string): boolean {
-  return /Effect\.gen\s*\(\s*function\s*\*\s*\(\)\s*\{/.test(source)
-}
+// Marker comment used to identify blocks that came from gen {} syntax
+const EFFECT_SUGAR_MARKER = '__EFFECT_SUGAR__'
 
 /**
- * Find all Effect.gen(function* () { ... }) blocks
+ * Check if source contains Effect.gen patterns with our marker
+ * (Only returns true for blocks that came from gen {} transformation)
  */
-export function findEffectGenBlocks(source: string): EffectGenBlock[] {
+export const hasEffectGen = (source: string): boolean =>
+  source.includes(EFFECT_SUGAR_MARKER) &&
+  /Effect\.gen\s*\(\s*\/\*\s*__EFFECT_SUGAR__\s*\*\/\s*function\s*\*\s*\(\)\s*\{/.test(source)
+
+/**
+ * Find all Effect.gen blocks that have our marker comment.
+ * Only finds blocks that came from gen {} syntax transformation.
+ */
+export const findEffectGenBlocks = (source: string): EffectGenBlock[] => {
   const blocks: EffectGenBlock[] = []
-  // Match Effect.gen(function* () {
-  const pattern = /Effect\.gen\s*\(\s*function\s*\*\s*\(\)\s*\{/g
+  // Match Effect.gen( followed by marker comment and function* ()
+  // Pattern: Effect.gen(/* __EFFECT_SUGAR__ */ function* () {
+  const pattern = new RegExp(
+    'Effect\\.gen\\s*\\(\\s*\\/\\*\\s*__EFFECT_SUGAR__\\s*\\*\\/\\s*function\\s*\\*\\s*\\(\\)\\s*\\{',
+    'g'
+  )
 
   let match: RegExpExecArray | null
   while ((match = pattern.exec(source)) !== null) {
@@ -139,8 +142,14 @@ export function findEffectGenBlocks(source: string): EffectGenBlock[] {
 
 /**
  * Transform Effect.gen body content back to gen {} syntax
+ *
+ * CONSERVATIVE APPROACH: Only transform `const x = yield* expr` to `x <- expr`.
+ * We intentionally do NOT convert `const` back to `let` because:
+ * 1. The gen block body may contain nested functions/callbacks with their own consts
+ * 2. It's impossible to reliably distinguish original `let` from original `const`
+ * 3. Using `const` is valid TypeScript and doesn't affect semantics
  */
-export function reverseTransformContent(content: string): string {
+export const reverseTransformContent = (content: string): string => {
   const lines = content.split('\n')
   const outputLines: string[] = []
 
@@ -161,7 +170,7 @@ export function reverseTransformContent(content: string): string {
 
     const indent = line.match(/^\s*/)?.[0] || ''
 
-    // yield* statement: const x = yield* expression
+    // yield* statement: const x = yield* expression → x <- expression
     const yieldMatch = trimmed.match(/^const\s+(\w+)\s*=\s*yield\s*\*\s*(.+)$/)
     if (yieldMatch) {
       const [, varName, expr] = yieldMatch
@@ -171,21 +180,8 @@ export function reverseTransformContent(content: string): string {
       continue
     }
 
-    // Regular const (non-yield): const x = expression → let x = expression
-    // But only if it's a simple const, not destructuring or complex patterns
-    const constMatch = trimmed.match(/^const\s+(\w+)\s*=\s*(.+)$/)
-    if (constMatch) {
-      const [, varName, expr] = constMatch
-      // Check if this looks like it was a let statement (no yield*)
-      if (!expr.includes('yield')) {
-        const cleanExpr = expr.replace(/;?\s*$/, '')
-        const hasSemicolon = expr.trimEnd().endsWith(';')
-        outputLines.push(`${indent}let ${varName} = ${cleanExpr}${hasSemicolon ? ';' : ''}`)
-        continue
-      }
-    }
-
     // Everything else passes through unchanged
+    // Note: We intentionally keep `const` as-is instead of converting to `let`
     outputLines.push(line)
   }
 
@@ -195,7 +191,7 @@ export function reverseTransformContent(content: string): string {
 /**
  * Transform Effect.gen(function* () { ... }) back to gen { ... }
  */
-export function reverseTransformSource(source: string): string {
+export const reverseTransformSource = (source: string): string => {
   if (!hasEffectGen(source)) {
     return source
   }
@@ -219,7 +215,7 @@ export function reverseTransformSource(source: string): string {
 }
 
 // ============================================================================
-// Prettier Plugin
+// Prettier Integration with Effect
 // ============================================================================
 
 export interface PrettierOptions {
@@ -228,50 +224,73 @@ export interface PrettierOptions {
   [key: string]: unknown
 }
 
+export class PrettierError {
+  readonly _tag = 'PrettierError'
+  readonly message: string
+  readonly cause?: unknown
+
+  constructor(message: string, cause?: unknown) {
+    this.cause = cause
+    // Include cause in message for better debugging
+    this.message = cause ? `${message}: ${cause}` : message
+  }
+}
+
 /**
  * Format source code with effect-sugar support
  *
- * This function:
+ * This Effect:
  * 1. Transforms gen {} to Effect.gen()
  * 2. Formats with Prettier
  * 3. Transforms Effect.gen() back to gen {}
  */
-export async function formatWithEffectSugar(
+export const formatWithEffectSugar = (
   source: string,
   options: PrettierOptions = {}
-): Promise<string> {
-  // Dynamic import to make prettier optional
-  const prettier = await import('prettier')
-
-  // If no gen blocks, just format normally
-  if (!hasGenBlocks(source)) {
-    return prettier.format(source, {
-      ...options,
-      parser: options.parser || 'typescript'
+): Effect.Effect<string, PrettierError> =>
+  Effect.gen(function* () {
+    // Dynamic import prettier
+    const prettier = yield* Effect.tryPromise({
+      try: () => import('prettier'),
+      catch: (e) => new PrettierError('Failed to import prettier', e)
     })
-  }
 
-  // Transform gen {} → Effect.gen()
-  const transformed = transformSource(source, options.filepath)
+    // If no gen blocks, just format normally
+    if (!hasGenBlocks(source)) {
+      const formatted = yield* Effect.tryPromise({
+        try: () => prettier.format(source, {
+          ...options,
+          parser: options.parser || 'typescript'
+        }),
+        catch: (e) => new PrettierError('Prettier format failed', e)
+      })
+      return formatted
+    }
 
-  // Format with Prettier
-  const formatted = await prettier.format(transformed.code, {
-    ...options,
-    parser: options.parser || 'typescript'
+    // Transform gen {} → Effect.gen()
+    const transformed = transformSource(source, options.filepath)
+
+    // Format with Prettier
+    const formatted = yield* Effect.tryPromise({
+      try: () => prettier.format(transformed.code, {
+        ...options,
+        parser: options.parser || 'typescript'
+      }),
+      catch: (e) => new PrettierError('Prettier format failed', e)
+    })
+
+    // Transform Effect.gen() → gen {}
+    return reverseTransformSource(formatted)
   })
-
-  // Transform Effect.gen() → gen {}
-  return reverseTransformSource(formatted)
-}
 
 /**
  * Synchronous version for use cases that don't support async
  */
-export function formatWithEffectSugarSync(
+export const formatWithEffectSugarSync = (
   source: string,
   prettierFormat: (source: string, options: PrettierOptions) => string,
   options: PrettierOptions = {}
-): string {
+): string => {
   // If no gen blocks, just format normally
   if (!hasGenBlocks(source)) {
     return prettierFormat(source, {
