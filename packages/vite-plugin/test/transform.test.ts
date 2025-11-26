@@ -256,17 +256,14 @@ export { program }
 })
 
 describe('edge cases', () => {
-  it('handles gen keyword in strings (known limitation)', () => {
-    // KNOWN LIMITATION: gen { } inside strings will still be transformed
-    // This is acceptable because:
-    // 1. It's rare to have literal "gen { }" in strings
-    // 2. The transformation is idempotent and won't break valid code
+  it('correctly ignores gen keyword in strings (fixed with js-tokens)', () => {
+    // With js-tokens scanner, gen {} inside strings is correctly ignored
+    // This was a limitation of the old regex-based approach
     const source = 'const msg = "use gen { } for effects"'
     const result = transformSource(source)
 
-    // The regex-based detection finds "gen {" even in strings
-    // This is a trade-off for simplicity
-    expect(result.hasChanges).toBe(true)
+    // js-tokens correctly identifies this as a string, not a gen block
+    expect(result.hasChanges).toBe(false)
   })
 
   it('handles arrow functions in let statements', () => {
@@ -342,5 +339,43 @@ describe('edge cases', () => {
 
     expect(result.code).toContain('const x = yield* getValue()')
     expect(result.code).toContain("const cleaned = x.replace(/[{}]/g, '')")
+  })
+
+  it('transforms binds inside if/else blocks (bug fix)', () => {
+    // Binds inside control flow should be transformed
+    // Only binds inside nested functions/callbacks should be skipped
+    const source = `gen {
+  config <- loadConfig()
+  let info = getInfo(config)
+
+  if (!info) {
+    _ <- Effect.fail(new Error("Not found"))
+  }
+
+  return info
+}`
+    const result = transformSource(source)
+
+    // Both binds should be transformed
+    expect(result.code).toContain('const config = yield* loadConfig()')
+    expect(result.code).toContain('const _ = yield* Effect.fail(new Error("Not found"))')
+  })
+
+  it('does NOT transform binds inside nested arrow functions', () => {
+    // Binds inside callbacks should NOT be transformed (wrong scope)
+    const source = `gen {
+  items <- getItems()
+  const processed = items.map((item) => {
+    x <- transform(item)
+    return x
+  })
+  return processed
+}`
+    const result = transformSource(source)
+
+    // Top-level bind should be transformed
+    expect(result.code).toContain('const items = yield* getItems()')
+    // Bind inside arrow function should NOT be transformed (it's in callback scope)
+    expect(result.code).toContain('x <- transform(item)')
   })
 })

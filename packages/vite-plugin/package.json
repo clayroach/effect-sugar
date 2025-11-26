@@ -34,8 +34,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf target/dist",
-    "version:dev": "npm version --no-git-tag-version \"$(node -p \"require('./package.json').version.split('-')[0]\")-dev.$(date +%Y%m%d).$(git rev-parse --short HEAD)\"",
-    "publish:dev": "pnpm build && pnpm version:dev && pnpm publish --registry http://localhost:4873 --no-git-checks && git checkout package.json"
+    "version:dev": "npm version --no-git-tag-version \"$(node -p \"require('./package.json').version.split('-')[0]\")-dev.$(date +%Y%m%d%H%M%S)\"",
+    "publish:dev": "pnpm build && pnpm version:dev && pnpm publish --registry http://localhost:4873 --no-git-checks"
   },
   "peerDependencies": {
     "esbuild": ">=0.17.0",
@@ -58,6 +58,7 @@
     "vitest": "^1.0.0"
   },
   "dependencies": {
+    "js-tokens": "^9.0.1",
     "magic-string": "^0.30.5"
   },
   "keywords": [
