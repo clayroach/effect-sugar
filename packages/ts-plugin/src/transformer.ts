@@ -3,9 +3,16 @@
  *
  * Handles transformation of gen { } blocks to Effect.gen() with precise position tracking.
  * Builds segment mappings incrementally as transformations are applied.
+ *
+ * Uses shared scanner from effect-sugar-transform for robust parsing.
  */
 
 import MagicString from 'magic-string'
+import {
+  hasGenBlocks as scannerHasGenBlocks,
+  findGenBlocks as scannerFindGenBlocks,
+  transformBlockContent as scannerTransformBlockContent
+} from 'effect-sugar-transform'
 import {
   createSegmentMapper,
   createIdentityMapper,
@@ -24,54 +31,19 @@ export interface TransformResult {
 // Re-export for backwards compatibility
 export type PositionMapping = SegmentMapper
 
+// Re-export scanner functions (with adapter for ts-plugin interface)
+export const hasGenBlocks = scannerHasGenBlocks
+
 export function findGenBlocks(
   source: string
 ): Array<{ start: number; end: number; blockContent: string }> {
-  const blocks: Array<{ start: number; end: number; blockContent: string }> = []
-  const pattern = /\bgen\s*\{/g
-
-  let match: RegExpExecArray | null
-  while ((match = pattern.exec(source)) !== null) {
-    const start = match.index
-    const braceStart = source.indexOf('{', start)
-
-    let depth = 1
-    let pos = braceStart + 1
-    let inString: string | null = null
-
-    while (pos < source.length && depth > 0) {
-      const char = source[pos]
-
-      if (inString) {
-        if (char === inString && source[pos - 1] !== '\\') {
-          inString = null
-        }
-        pos++
-        continue
-      }
-
-      if (char === '"' || char === "'" || char === '`') {
-        inString = char
-        pos++
-        continue
-      }
-
-      if (char === '{') depth++
-      if (char === '}') depth--
-      pos++
-    }
-
-    if (depth === 0) {
-      const blockContent = source.slice(braceStart + 1, pos - 1)
-      blocks.push({ start, end: pos, blockContent })
-    }
-  }
-
-  return blocks
-}
-
-export function hasGenBlocks(source: string): boolean {
-  return /\bgen\s*\{/.test(source)
+  // Use scanner's findGenBlocks and adapt to ts-plugin interface
+  const blocks = scannerFindGenBlocks(source)
+  return blocks.map(block => ({
+    start: block.start,
+    end: block.end,
+    blockContent: block.content
+  }))
 }
 
 /**

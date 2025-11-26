@@ -152,3 +152,13 @@ export default function effectSugarPlugin(
 export { parseEffBlock } from './parser.js'
 export { generateEffectGen } from './generator.js'
 export type { EffBlock, Statement } from './parser.js'
+
+// Export shared scanner (used by vite-plugin and ts-plugin)
+export {
+  hasGenBlocks,
+  findGenBlocks,
+  transformBlockContent,
+  tokenize,
+  type GenBlock,
+  type TokenWithPosition
+} from './scanner.js'

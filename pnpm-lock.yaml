@@ -25,6 +25,10 @@ importers:
         version: 1.6.1(@types/node@20.19.25)
 
   packages/transform:
+    dependencies:
+      js-tokens:
+        specifier: ^9.0.1
+        version: 9.0.1
     devDependencies:
       '@babel/core':
         specifier: ^7.23.0
@@ -53,6 +57,9 @@ importers:
 
   packages/ts-plugin:
     dependencies:
+      effect-sugar-transform:
+        specifier: workspace:*
+        version: link:../transform
       magic-string:
         specifier: ^0.30.5
         version: 0.30.21
@@ -66,9 +73,9 @@ importers:
 
   packages/vite-plugin:
     dependencies:
-      js-tokens:
-        specifier: ^9.0.1
-        version: 9.0.1
+      effect-sugar-transform:
+        specifier: workspace:*
+        version: link:../transform
       magic-string:
         specifier: ^0.30.5
         version: 0.30.21

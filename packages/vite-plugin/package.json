@@ -58,7 +58,7 @@
     "vitest": "^1.0.0"
   },
   "dependencies": {
-    "js-tokens": "^9.0.1",
+    "effect-sugar-transform": "workspace:*",
     "magic-string": "^0.30.5"
   },
   "keywords": [
