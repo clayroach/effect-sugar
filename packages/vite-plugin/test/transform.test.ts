@@ -81,11 +81,12 @@ describe('transformBlockContent', () => {
     expect(output).toBe('  const user = yield* getUser(id);')
   })
 
-  it('transforms let statements to const', () => {
+  it('preserves let statements as-is', () => {
     const input = '  let name = user.name'
     const output = transformBlockContent(input)
 
-    expect(output).toBe('  const name = user.name')
+    // let is preserved to avoid breaking nested callbacks
+    expect(output).toBe('  let name = user.name')
   })
 
   it('preserves return statements', () => {
@@ -124,14 +125,18 @@ describe('transformBlockContent', () => {
 `
     const output = transformBlockContent(input)
 
+    // Note: let is preserved, only bind arrows are transformed
     expect(output).toBe(`
   const user = yield* getUser(id)
   const profile = yield* getProfile(user.id)
-  const name = user.name.toUpperCase()
+  let name = user.name.toUpperCase()
   return { user, profile, name }
 `)
   })
 })
+
+// Marker comment added by transformation to identify gen {} blocks
+const MARKER = '/* __EFFECT_SUGAR__ */ '
 
 describe('transformSource', () => {
   it('transforms a simple gen block', () => {
@@ -139,7 +144,7 @@ describe('transformSource', () => {
     const result = transformSource(source)
 
     expect(result.hasChanges).toBe(true)
-    expect(result.code).toBe('const x = Effect.gen(function* () { return 1 })')
+    expect(result.code).toBe(`const x = Effect.gen(${MARKER}function* () { return 1 })`)
   })
 
   it('transforms bind statements', () => {
@@ -150,21 +155,22 @@ describe('transformSource', () => {
     const result = transformSource(source)
 
     expect(result.hasChanges).toBe(true)
-    expect(result.code).toBe(`const program = Effect.gen(function* () {
+    expect(result.code).toBe(`const program = Effect.gen(${MARKER}function* () {
   const user = yield* getUser(id)
   return user
 })`)
   })
 
-  it('transforms let statements', () => {
+  it('preserves let statements (only bind arrows are transformed)', () => {
     const source = `const program = gen {
   let x = 1
   return x
 }`
     const result = transformSource(source)
 
-    expect(result.code).toBe(`const program = Effect.gen(function* () {
-  const x = 1
+    // let is preserved - only bind arrows are transformed to const
+    expect(result.code).toBe(`const program = Effect.gen(${MARKER}function* () {
+  let x = 1
   return x
 })`)
   })
@@ -177,8 +183,8 @@ const b = gen { return 2 }
     const result = transformSource(source)
 
     expect(result.code).toBe(`
-const a = Effect.gen(function* () { return 1 })
-const b = Effect.gen(function* () { return 2 })
+const a = Effect.gen(${MARKER}function* () { return 1 })
+const b = Effect.gen(${MARKER}function* () { return 2 })
 `)
   })
 
@@ -197,7 +203,7 @@ export { program }
 
     expect(result.code).toContain("import { Effect } from 'effect'")
     expect(result.code).toContain('const helper = (x: number) => x * 2')
-    expect(result.code).toContain('Effect.gen(function* () {')
+    expect(result.code).toContain(`Effect.gen(${MARKER}function* () {`)
     expect(result.code).toContain('export { program }')
   })
 
@@ -270,7 +276,8 @@ describe('edge cases', () => {
 }`
     const result = transformSource(source)
 
-    expect(result.code).toContain('const doubled = [1,2,3].map(x => x * 2)')
+    // let is preserved (no longer transformed to const)
+    expect(result.code).toContain('let doubled = [1,2,3].map(x => x * 2)')
   })
 
   it('handles method chains', () => {
@@ -283,5 +290,57 @@ describe('edge cases', () => {
     const result = transformSource(source)
 
     expect(result.code).toContain('const result = yield* api')
+  })
+
+  it('preserves let in nested callbacks (critical bug fix)', () => {
+    // Regression test for: tmp/2025-11-25/NESTED_CALLBACK_LET_BUG.md
+    // let declarations inside nested functions must NOT be transformed to const
+    const source = `gen {
+  result <- Effect.try({
+    try: () => {
+      let x = 1
+      x = 2
+      return x
+    }
+  })
+  return result
+}`
+    const result = transformSource(source)
+
+    // The nested let MUST be preserved - transforming to const would break the reassignment
+    expect(result.code).toContain('let x = 1')
+    expect(result.code).toContain('x = 2')
+  })
+
+  it('handles regex literals with braces (critical bug fix)', () => {
+    // Regression test: regex like /\$\{([^}]+)\}/g has braces that must not affect depth counting
+    const source = `gen {
+  result <- Effect.try({
+    try: () => {
+      const text = str.replace(/\\$\\{([^}]+)\\}/g, (match) => match)
+      return text
+    }
+  })
+  return result
+}`
+    const result = transformSource(source)
+
+    // The return statement must be INSIDE Effect.gen, not outside
+    // Before fix: })) appeared, and return was outside
+    expect(result.code).not.toContain('}))') // No double closing
+    expect(result.code).toMatch(/return result\s*\n\s*\}\)$/) // return inside gen
+  })
+
+  it('handles regex character classes with special chars', () => {
+    // Character class [^}] should not count } as closing brace
+    const source = `gen {
+  x <- getValue()
+  const cleaned = x.replace(/[{}]/g, '')
+  return cleaned
+}`
+    const result = transformSource(source)
+
+    expect(result.code).toContain('const x = yield* getValue()')
+    expect(result.code).toContain("const cleaned = x.replace(/[{}]/g, '')")
   })
 })
