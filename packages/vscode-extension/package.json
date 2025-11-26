@@ -69,7 +69,7 @@
   },
   "scripts": {
     "build": "tsc -p ./ && pnpm run postcompile",
-    "postcompile": "mkdir -p ../../examples/node_modules && rm -rf ../../examples/node_modules/effect-sugar-ts-plugin && cp -r node_modules/effect-sugar-ts-plugin ../../examples/node_modules/",
+    "postcompile": "mkdir -p ../../examples/node_modules/effect-sugar-ts-plugin && cp -r target/ts-plugin/* ../../examples/node_modules/effect-sugar-ts-plugin/ && cp ts-plugin/package.json ../../examples/node_modules/effect-sugar-ts-plugin/",
     "dev": "tsc -watch -p ./",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf target ../../examples/node_modules/effect-sugar-ts-plugin",
@@ -78,7 +78,8 @@
     "install-extension": "code --install-extension ../../target/effect-sugar-0.1.0.vsix"
   },
   "dependencies": {
-    "effect-sugar-ts-plugin": "workspace:*",
+    "effect-sugar-transform": "workspace:*",
+    "magic-string": "^0.30.5",
     "prettier": "^3.0.0"
   },
   "devDependencies": {
