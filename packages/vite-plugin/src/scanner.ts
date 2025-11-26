@@ -137,7 +137,6 @@ function isInsideNestedFunction(tokens: TokenWithPosition[], upToIndex: number):
 
   for (let i = 0; i < upToIndex; i++) {
     const t = tokens[i]
-    const prev = i > 0 ? tokens[i - 1] : null
 
     // Check for function keyword or arrow
     if (t.type === 'IdentifierName' && t.value === 'function') {
