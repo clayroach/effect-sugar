@@ -4,7 +4,7 @@
   "private": true,
   "description": "Effect-TS syntactic sugar with for-comprehension style gen blocks",
   "type": "module",
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@10.23.0",
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
