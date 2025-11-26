@@ -188,137 +188,17 @@ Example: `tmp/2025-11-24/VIRTUAL_FILE_APPROACH.md`
 
 ---
 
-## Development Best Practices
+See `~/.claude/CLAUDE.md` for global development principles (over-engineering, time estimates, git workflow, testing, etc.).
 
-### Avoid Over-Engineering
-
-**ONLY implement what is explicitly requested - NO speculative features:**
-
-- Implement EXACTLY what the issue/spec describes
-- Keep solutions minimal and focused
-- Ask for clarification rather than assuming requirements
-- **When in doubt**: Implement the minimum viable solution
-
-### No Time Estimates
-
-**NEVER include time estimates in implementation plans:**
-
-- Use phase-based organization (Phase 1, Phase 2, Phase 3)
-- Use priority-based labels (Immediate, Short-term, Long-term)
-- Focus on dependency relationships between tasks
-
-### Test-Before-Commit Workflow
-
-**MANDATORY for all code changes:**
+## Project-Specific Testing
 
 ```bash
-# 1. Make code changes
-# 2. RUN TESTS
+# Run tests before committing
 pnpm test
 
-# 3. ONLY commit if tests pass
-git add [files]
-git commit -m "message"
+# Run integration tests
+pnpm test:integration
 ```
-
-**NEVER** commit without running tests or mark tests as "verified" without actually running them.
-
-### Git Workflow - Feature Branches
-
-**ALWAYS use feature branches:**
-
-```bash
-git checkout -b feat/feature-name
-git commit -m "feat: description"
-git push -u origin feat/feature-name
-gh pr create
-```
-
-### Multi-Line Content - Use Temporary Files
-
-**ALWAYS write multi-line content to temporary files:**
-
-```bash
-# Commits
-cat > /tmp/commit-msg.txt << 'EOF'
-feat: Brief description
-
-Detailed explanation.
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-EOF
-git commit -F /tmp/commit-msg.txt
-
-# PR bodies
-cat > /tmp/pr-body.txt << 'EOF'
-## Summary
-...
-EOF
-gh pr create --title "feat: title" --body-file /tmp/pr-body.txt
-```
-
-### Bash Command Formatting
-
-**NEVER use backslash line continuations** - use single-line commands with `&&` chaining:
-
-```bash
-# CORRECT
-echo "Check" && grep -n "pattern" file.ts && echo "Done"
-
-# WRONG - causes errors
-echo "Check" && \
-grep -n "pattern" file.ts
-```
-
-### Never Declare Early Success
-
-**NEVER declare success while known issues exist:**
-
-- State what actually works (with evidence)
-- Acknowledge all known issues
-- Be specific about failures
-- Provide next steps
-
-## Effect MCP Server for Documentation Lookup
-
-**MANDATORY:** Before implementing any Effect-based functionality, use the Effect MCP server:
-
-### 1. Search for Effect-native patterns
-
-```
-Use mcp__effect-docs__effect_docs_search to find relevant Effect patterns
-Example queries: "layer composition", "resource management", "error handling", "generator"
-```
-
-### 2. Validate your approach
-
-```
-After finding relevant docs, use mcp__effect-docs__get_effect_doc to read full documentation
-Verify your planned approach matches Effect best practices
-```
-
-### 3. Find Effect-native alternatives
-
-Before using Promise.all(), Array.map(), etc., search Effect docs for:
-- `Effect.all()` for concurrent operations
-- `Effect.forEach()` for iteration
-- `Effect.gen()` for generator syntax
-- `Effect.tryPromise()` for wrapping promises
-
-### When to check Effect docs
-
-**ALWAYS check before:**
-- Implementing concurrent operations
-- Managing resources (files, connections)
-- Handling errors with typed errors
-- Working with async operations
-- Creating new layers or services
-
-**Example searches:**
-- "generator syntax"
-- "layer dependency injection"
-- "error handling tagged errors"
-- "concurrent effects"
 
 ## Available Agents
 
