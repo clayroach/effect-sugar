@@ -3,8 +3,6 @@
  *
  * Handles transformation of gen { } blocks to Effect.gen() with precise position tracking.
  * Builds segment mappings incrementally as transformations are applied.
- *
- * Uses shared scanner from effect-sugar-transform for robust parsing.
  */
 
 import MagicString from 'magic-string'
@@ -12,7 +10,7 @@ import {
   hasGenBlocks as scannerHasGenBlocks,
   findGenBlocks as scannerFindGenBlocks,
   transformBlockContent as scannerTransformBlockContent
-} from 'effect-sugar-transform'
+} from './scanner.js'
 import {
   createSegmentMapper,
   createIdentityMapper,

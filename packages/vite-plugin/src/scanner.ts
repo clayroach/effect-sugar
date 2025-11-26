@@ -126,32 +126,64 @@ export function findGenBlocks(source: string): GenBlock[] {
 }
 
 /**
- * Check if a position in token stream is at "top level" (brace depth 0)
- * This is used to determine if a <- or let should be transformed
+ * Check if a position is inside a nested function/callback
+ * We want to transform binds inside control flow (if/else/try/catch)
+ * but NOT inside nested functions/callbacks (different scope)
  */
-function isAtTopLevel(tokens: TokenWithPosition[], upToIndex: number): boolean {
-  let depth = 0
+function isInsideNestedFunction(tokens: TokenWithPosition[], upToIndex: number): boolean {
+  // Look for function or arrow function patterns before the current position
+  // Track depth to find if we're inside a function body
+  let functionDepth = 0
 
   for (let i = 0; i < upToIndex; i++) {
     const t = tokens[i]
-    if (t.type === 'Punctuator') {
-      if (t.value === '{' || t.value === '(' || t.value === '[') depth++
-      if (t.value === '}' || t.value === ')' || t.value === ']') depth--
+    const prev = i > 0 ? tokens[i - 1] : null
+
+    // Check for function keyword or arrow
+    if (t.type === 'IdentifierName' && t.value === 'function') {
+      // Found 'function', next '{' starts a function body
+      for (let j = i + 1; j < upToIndex; j++) {
+        if (tokens[j].type === 'Punctuator' && tokens[j].value === '{') {
+          functionDepth++
+          break
+        }
+      }
+    }
+
+    // Check for arrow function: ) => {
+    if (t.type === 'Punctuator' && t.value === '=>') {
+      // Look ahead for {
+      for (let j = i + 1; j < upToIndex; j++) {
+        const next = tokens[j]
+        if (next.type === 'Punctuator' && next.value === '{') {
+          functionDepth++
+          break
+        }
+        // If we hit something other than whitespace before {, it's expression arrow
+        if (next.type !== 'WhiteSpace' && next.type !== 'LineTerminatorSequence') {
+          break
+        }
+      }
+    }
+
+    // Track closing braces
+    if (t.type === 'Punctuator' && t.value === '}' && functionDepth > 0) {
+      functionDepth--
     }
   }
 
-  return depth === 0
+  return functionDepth > 0
 }
 
 /**
  * Transform gen block content to Effect.gen body
  *
- * Only transforms:
- * - `x <- expr` → `const x = yield* expr` (at top level only)
+ * Transforms:
+ * - `x <- expr` → `const x = yield* expr` (anywhere except inside nested functions)
  *
  * Does NOT transform:
  * - let/const declarations (preserves them as-is)
- * - Anything inside nested functions/callbacks
+ * - Binds inside nested functions/callbacks (they're a different scope)
  */
 export function transformBlockContent(content: string): string {
   const tokens = tokenize(content)
@@ -171,15 +203,13 @@ export function transformBlockContent(content: string): string {
       continue
     }
 
-    // Check if this line is at top level
-    // Find the first significant token on this line
+    // Check if this line is inside a nested function/callback
     const firstTokenIndex = tokens.findIndex(t => t.start >= lineStart && t.start < lineEnd)
-    const atTopLevel = firstTokenIndex >= 0 ? isAtTopLevel(tokens, firstTokenIndex) : true
+    const insideNestedFunction = firstTokenIndex >= 0 ? isInsideNestedFunction(tokens, firstTokenIndex) : false
 
-    // Only attempt to parse bind at top level
-    if (atTopLevel) {
+    // Transform bind statements unless inside a nested function
+    if (!insideNestedFunction) {
       // Look for pattern: identifier <- expression
-      // Token sequence: IdentifierName, optional whitespace, Punctuator(<), Punctuator(-), ...
       const bindMatch = trimmed.match(/^(\w+)\s*<-\s*(.+)$/)
 
       if (bindMatch) {

@@ -9,7 +9,12 @@
 
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { transformSource } from '../../packages/transform/target/dist/index.js'
+import { transformSource as transformSourceFull } from '../../packages/vite-plugin/target/dist/transform.js'
+
+// Adapt the interface - vite-plugin returns { code, map, hasChanges }
+function transformSource(input: string): string {
+  return transformSourceFull(input).code
+}
 
 describe('effect-sugar integration', () => {
   describe('transformation', () => {
@@ -21,12 +26,13 @@ const program = gen {
 }`
       const result = transformSource(input)
 
-      expect(result).toContain('Effect.gen(function* ()')
+      expect(result).toContain('Effect.gen(')
+      expect(result).toContain('function* ()')
       expect(result).toContain('const x = yield* Effect.succeed(42)')
       expect(result).toContain('return x')
     })
 
-    it('transforms multiple binds and let statements', () => {
+    it('transforms multiple binds and preserves let statements', () => {
       const input = `
 const program = gen {
   a <- Effect.succeed(1)
@@ -38,11 +44,12 @@ const program = gen {
 
       expect(result).toContain('const a = yield* Effect.succeed(1)')
       expect(result).toContain('const b = yield* Effect.succeed(2)')
-      expect(result).toContain('const sum = a + b')
+      // let is preserved (only bind arrows are transformed)
+      expect(result).toContain('let sum = a + b')
       expect(result).toContain('return sum')
     })
 
-    it('transforms if/else statements', () => {
+    it('preserves if/else statements', () => {
       const input = `
 const program = gen {
   x <- Effect.succeed(10)
@@ -54,7 +61,8 @@ const program = gen {
 }`
       const result = transformSource(input)
 
-      expect(result).toContain('if ((x > 5))')
+      // if/else is preserved as-is (no wrapping)
+      expect(result).toContain('if (x > 5)')
       expect(result).toContain('return "large"')
       expect(result).toContain('return "small"')
     })
@@ -85,7 +93,9 @@ const second = gen {
 }`
       const result = transformSource(input)
 
-      expect((result.match(/Effect\.gen\(function\* \(\)/g) || []).length).toBe(2)
+      // Match the marker comment pattern used by vite-plugin
+      expect((result.match(/Effect\.gen\(/g) || []).length).toBe(2)
+      expect((result.match(/function\* \(\)/g) || []).length).toBe(2)
     })
 
     it('preserves <- operator with multiline effect calls', () => {

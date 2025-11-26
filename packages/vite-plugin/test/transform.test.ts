@@ -340,4 +340,42 @@ describe('edge cases', () => {
     expect(result.code).toContain('const x = yield* getValue()')
     expect(result.code).toContain("const cleaned = x.replace(/[{}]/g, '')")
   })
+
+  it('transforms binds inside if/else blocks (bug fix)', () => {
+    // Binds inside control flow should be transformed
+    // Only binds inside nested functions/callbacks should be skipped
+    const source = `gen {
+  config <- loadConfig()
+  let info = getInfo(config)
+
+  if (!info) {
+    _ <- Effect.fail(new Error("Not found"))
+  }
+
+  return info
+}`
+    const result = transformSource(source)
+
+    // Both binds should be transformed
+    expect(result.code).toContain('const config = yield* loadConfig()')
+    expect(result.code).toContain('const _ = yield* Effect.fail(new Error("Not found"))')
+  })
+
+  it('does NOT transform binds inside nested arrow functions', () => {
+    // Binds inside callbacks should NOT be transformed (wrong scope)
+    const source = `gen {
+  items <- getItems()
+  const processed = items.map((item) => {
+    x <- transform(item)
+    return x
+  })
+  return processed
+}`
+    const result = transformSource(source)
+
+    // Top-level bind should be transformed
+    expect(result.code).toContain('const items = yield* getItems()')
+    // Bind inside arrow function should NOT be transformed (it's in callback scope)
+    expect(result.code).toContain('x <- transform(item)')
+  })
 })

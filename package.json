@@ -19,11 +19,9 @@
     "changeset": "changeset",
     "version": "changeset version",
     "publish": "turbo run build && changeset publish",
-    "publish:dryrun": "turbo run build && pnpm publish:dryrun:transform && pnpm publish:dryrun:vite",
-    "publish:dryrun:transform": "pnpm --filter effect-sugar-transform publish --dry-run --no-git-checks",
+    "publish:dryrun": "turbo run build && pnpm publish:dryrun:vite",
     "publish:dryrun:vite": "pnpm --filter effect-sugar-vite publish --dry-run --no-git-checks",
-    "publish:dev": "pnpm publish:dev:transform && pnpm publish:dev:vite",
-    "publish:dev:transform": "pnpm --filter effect-sugar-transform publish:dev",
+    "publish:dev": "pnpm publish:dev:vite",
     "publish:dev:vite": "pnpm --filter effect-sugar-vite publish:dev",
     "package:vscode": "pnpm --filter effect-sugar run package"
   },

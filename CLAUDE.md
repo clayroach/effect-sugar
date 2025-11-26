@@ -13,9 +13,6 @@ pnpm run build
 # Run all package tests
 pnpm run test
 
-# Run transform tests only
-pnpm --filter effect-sugar-transform test
-
 # Run vite-plugin tests only
 pnpm --filter effect-sugar-vite test
 
@@ -37,27 +34,21 @@ pnpm changeset
 ```
 effect-sugar/
 ├── packages/
-│   ├── transform/          # Core source transformer (effect-sugar-transform)
-│   │   ├── src/
-│   │   │   ├── parser.ts       # Custom syntax parser for gen { }
-│   │   │   ├── generator.ts    # Code generator for Effect.gen
-│   │   │   └── index.ts        # Entry point
-│   │   └── test/               # Unit tests
 │   ├── vite-plugin/        # Vite plugin + tsx loader (effect-sugar-vite)
 │   │   ├── src/
-│   │   │   ├── index.ts    # Vite plugin entry point
-│   │   │   ├── transform.ts # Core transformation logic
-│   │   │   ├── register.ts # tsx loader registration
+│   │   │   ├── index.ts        # Vite plugin entry point
+│   │   │   ├── transform.ts    # Core transformation logic
+│   │   │   ├── scanner.ts      # Token-based gen {} parser (js-tokens)
+│   │   │   ├── eslint.ts       # ESLint preprocessor
+│   │   │   ├── register.ts     # tsx loader registration
 │   │   │   └── loader-hooks.ts # Node.js loader hooks
 │   │   └── test/           # Unit tests
-│   ├── ts-plugin/          # TypeScript language service plugin (effect-sugar-ts-plugin)
-│   │   └── src/            # Plugin source files
 │   └── vscode-extension/   # VSCode extension (bundles ts-plugin)
+│       ├── src/            # Extension source
+│       └── ts-plugin/      # TypeScript language service plugin
 ├── test/
 │   └── integration/        # Integration tests with Effect-TS
-├── examples/               # Usage examples (.gen.ts files)
-├── scripts/
-│   └── preprocess.js       # Transforms gen blocks before TypeScript
+├── examples/               # Usage examples
 ├── turbo.json              # Turborepo configuration
 ├── pnpm-workspace.yaml     # pnpm workspace configuration
 └── target/                 # Build outputs
@@ -169,7 +160,7 @@ Use `.gen.ts` for files with gen block syntax. The preprocessing step outputs st
 
 ## Testing
 
-- **Unit tests**: Test parser and generator in isolation (`packages/transform/test/`)
+- **Unit tests**: Test scanner and transformation (`packages/vite-plugin/test/`)
 - **Integration tests**: Test full pipeline with Effect-TS (`test/integration/`)
 
 ## Current Status
