@@ -16,7 +16,7 @@
     "test:watch": "vitest --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf target/dist",
-    "version:dev": "npm version --no-git-tag-version \"$(node -p \"require('./package.json').version.split('-')[0]\")-dev.$(date +%Y%m%d).$(git rev-parse --short HEAD)\"",
+    "version:dev": "npm version --no-git-tag-version \"$(node -p \"require('./package.json').version.split('-')[0]\")-dev.$(date +%Y%m%d%H%M%S)\"",
     "publish:dev": "pnpm build && pnpm version:dev && pnpm publish --registry http://localhost:4873 --no-git-checks && git checkout package.json"
   },
   "keywords": [
