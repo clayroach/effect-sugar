@@ -10,11 +10,10 @@ pnpm add -D effect-sugar-vite
 
 ## Usage
 
-### Vite Plugin (Frontend)
-
-Add the plugin to your `vite.config.ts`:
+### Vite Plugin
 
 ```typescript
+// vite.config.ts
 import { defineConfig } from 'vite'
 import effectSugar from 'effect-sugar-vite'
 
@@ -23,21 +22,11 @@ export default defineConfig({
 })
 ```
 
-### tsx Loader (Backend/Node.js)
-
-For backend development with tsx:
+### tsx Loader (Node.js)
 
 ```bash
 pnpm add -D effect-sugar-vite esbuild
 ```
-
-Then run:
-
-```bash
-tsx --import effect-sugar-vite/register src/index.ts
-```
-
-Or in `package.json`:
 
 ```json
 {
@@ -47,63 +36,56 @@ Or in `package.json`:
 }
 ```
 
-Note: esbuild is required for the tsx loader to compile TypeScript files with gen blocks.
+### ESLint Preprocessor
 
-## What It Does
+```typescript
+// eslint.config.js
+import effectSugarPreprocessor from 'effect-sugar-vite/eslint'
 
-Transforms gen block syntax:
+export default [
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    processor: effectSugarPreprocessor
+  }
+]
+```
+
+## Transformation
 
 ```typescript
 // Input
 const program = gen {
   user <- getUser(id)
-  profile <- getProfile(user.id)
   let name = user.name.toUpperCase()
-  return { user, profile, name }
+  return { user, name }
 }
 
 // Output
 const program = Effect.gen(function* () {
   const user = yield* getUser(id)
-  const profile = yield* getProfile(user.id)
   const name = user.name.toUpperCase()
-  return { user, profile, name }
+  return { user, name }
 })
 ```
 
 ## Options
 
-### Vite Plugin Options
-
 ```typescript
 effectSugar({
-  // File extensions to process (default: ['.ts', '.tsx', '.mts', '.cts'])
-  include: ['.ts', '.tsx'],
-
-  // Patterns to exclude (default: [/node_modules/])
-  exclude: [/node_modules/, /\.test\.ts$/],
-
-  // Enable source maps (default: true)
-  sourcemap: true
+  include: ['.ts', '.tsx'],           // File extensions (default: ['.ts', '.tsx', '.mts', '.cts'])
+  exclude: [/node_modules/],          // Patterns to exclude
+  sourcemap: true                     // Enable source maps (default: true)
 })
 ```
 
-## IDE Support
-
-For full IntelliSense support, install the [effect-sugar VS Code extension](https://github.com/croach/effect-sugar).
-
 ## API
 
-For advanced usage, you can import the transformation utilities directly:
-
 ```typescript
-import { transformSource, hasGenBlocks, findGenBlocks } from 'effect-sugar-vite/transform'
+import { transformSource, hasGenBlocks } from 'effect-sugar-vite/transform'
 
-// Check if source contains gen blocks
 if (hasGenBlocks(source)) {
   const result = transformSource(source, 'filename.ts')
-  console.log(result.code)
-  console.log(result.map) // Source map
+  console.log(result.code, result.map)
 }
 ```
 

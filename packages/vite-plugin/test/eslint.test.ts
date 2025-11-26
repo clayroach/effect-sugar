@@ -79,11 +79,11 @@ export { x, y }
 
   describe('postprocess', () => {
     it('flattens messages from all code blocks', () => {
-      const messages = [
+      const messages: Array<Array<object>> = [
         [{ ruleId: 'no-console', line: 1 }],
         [{ ruleId: 'semi', line: 2 }]
       ]
-      const result = effectSugarPreprocessor.postprocess(messages as any, 'test.ts')
+      const result = effectSugarPreprocessor.postprocess(messages, 'test.ts')
 
       expect(result).toHaveLength(2)
     })
