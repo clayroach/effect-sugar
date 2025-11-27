@@ -13,9 +13,9 @@ const program = Effect.gen(function* () {
 
 // Write this:
 const program = gen {
-  user <- getUser(id)
-  profile <- getProfile(user.id)
-  let name = user.name.toUpperCase()
+  user       <- getUser(id)
+  profile    <- getProfile(user.id)
+  const name = user.name.toUpperCase()
   return { user, profile, name }
 }
 ```
