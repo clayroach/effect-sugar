@@ -1,14 +1,12 @@
 /**
- * Token-based scanner for gen {} blocks using js-tokens
+ * Token-based scanner for gen {} blocks
  *
- * Uses the battle-tested js-tokens package to properly handle:
- * - String literals (all types including template literals)
- * - Comments (single-line, multi-line, hashbang)
- * - Regex literals (correctly distinguished from division)
- * - All ECMAScript 2025 syntax
+ * Implements a simple tokenizer that properly handles:
+ * - String literals (single, double, template literals)
+ * - Comments (single-line, multi-line)
+ * - Identifiers and keywords
+ * - Punctuators
  */
-
-import jsTokens, { type Token } from 'js-tokens'
 
 export interface GenBlock {
   /** Start position of 'gen' keyword */
@@ -21,28 +19,305 @@ export interface GenBlock {
   braceStart: number
 }
 
-export type TokenWithPosition = Token & {
+/**
+ * Token types we care about
+ */
+type TokenType =
+  | 'IdentifierName'
+  | 'Punctuator'
+  | 'StringLiteral'
+  | 'TemplateLiteral'
+  | 'SingleLineComment'
+  | 'MultiLineComment'
+  | 'WhiteSpace'
+  | 'LineTerminatorSequence'
+  | 'Other'
+
+interface Token {
+  type: TokenType
+  value: string
   start: number
   end: number
 }
 
 /**
- * Tokenize source and add position information
+ * Check if a regex literal can start at the current position
+ * based on the previous significant token
  */
-export function tokenize(source: string): TokenWithPosition[] {
-  const tokens: TokenWithPosition[] = []
+function canStartRegex(tokens: Array<Token>): boolean {
+  // Find the last significant token (skip whitespace/comments)
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const t = tokens[i]
+    if (
+      t.type === 'WhiteSpace' ||
+      t.type === 'LineTerminatorSequence' ||
+      t.type === 'SingleLineComment' ||
+      t.type === 'MultiLineComment'
+    ) {
+      continue
+    }
+
+    // After these, / is likely division
+    if (t.type === 'IdentifierName') {
+      // Special keywords that can be followed by regex
+      const keywords = ['return', 'case', 'throw', 'in', 'of', 'typeof', 'instanceof', 'void', 'delete', 'new']
+      if (keywords.includes(t.value)) {
+        return true
+      }
+      return false // Other identifiers: likely division
+    }
+
+    if (t.type === 'Other') {
+      // Numbers - division
+      return false
+    }
+
+    if (t.type === 'Punctuator') {
+      // After these, / starts a regex
+      const regexStarters = ['(', '[', '{', ',', ';', ':', '=', '!', '&', '|', '^', '~', '<', '>', '?', '+', '-', '*', '%']
+      if (regexStarters.includes(t.value)) {
+        return true
+      }
+      // After ++, --, division
+      if (t.value === '++' || t.value === '--') {
+        return false
+      }
+      // After ), ], likely division (but could be regex after if/while/for)
+      if (t.value === ')' || t.value === ']') {
+        return false
+      }
+      // After }, could be either - assume regex for safety
+      if (t.value === '}') {
+        return true
+      }
+    }
+
+    // Default: assume regex
+    return true
+  }
+
+  // No previous token - start of file, regex is valid
+  return true
+}
+
+/**
+ * Simple tokenizer for JavaScript/TypeScript
+ * Handles the cases we need for gen block parsing
+ */
+function tokenize(source: string): Array<Token> {
+  const tokens: Array<Token> = []
   let pos = 0
 
-  for (const token of jsTokens(source)) {
-    tokens.push({
-      ...token,
-      start: pos,
-      end: pos + token.value.length
-    } as TokenWithPosition)
-    pos += token.value.length
+  while (pos < source.length) {
+    const char = source[pos]
+    const start = pos
+
+    // Whitespace
+    if (char === ' ' || char === '\t') {
+      while (pos < source.length && (source[pos] === ' ' || source[pos] === '\t')) {
+        pos++
+      }
+      tokens.push({ type: 'WhiteSpace', value: source.slice(start, pos), start, end: pos })
+      continue
+    }
+
+    // Line terminators
+    if (char === '\n' || char === '\r') {
+      if (char === '\r' && source[pos + 1] === '\n') {
+        pos += 2
+      } else {
+        pos++
+      }
+      tokens.push({ type: 'LineTerminatorSequence', value: source.slice(start, pos), start, end: pos })
+      continue
+    }
+
+    // Comments and regex literals
+    if (char === '/') {
+      if (source[pos + 1] === '/') {
+        // Single-line comment
+        pos += 2
+        while (pos < source.length && source[pos] !== '\n' && source[pos] !== '\r') {
+          pos++
+        }
+        tokens.push({ type: 'SingleLineComment', value: source.slice(start, pos), start, end: pos })
+        continue
+      }
+      if (source[pos + 1] === '*') {
+        // Multi-line comment
+        pos += 2
+        while (pos < source.length - 1 && !(source[pos] === '*' && source[pos + 1] === '/')) {
+          pos++
+        }
+        pos += 2 // Skip */
+        tokens.push({ type: 'MultiLineComment', value: source.slice(start, pos), start, end: pos })
+        continue
+      }
+      // Check if this is a regex literal
+      // Regex can appear after: (, [, {, ,, ;, :, =, !, &, |, ^, ~, <, >, ?, return, case, etc.
+      // We use a heuristic: look at previous significant token
+      // Special case: </identifier> is JSX closing tag, not regex
+      const nextChar = source[pos + 1]
+      const isJsxClosingTag = nextChar && isIdentifierStart(nextChar)
+      if (!isJsxClosingTag && canStartRegex(tokens)) {
+        pos++ // Skip opening /
+        while (pos < source.length && source[pos] !== '/') {
+          if (source[pos] === '\\') {
+            pos += 2 // Skip escape sequence
+          } else if (source[pos] === '[') {
+            // Character class - skip to ]
+            pos++
+            while (pos < source.length && source[pos] !== ']') {
+              if (source[pos] === '\\') pos += 2
+              else pos++
+            }
+            pos++ // Skip ]
+          } else {
+            pos++
+          }
+        }
+        pos++ // Skip closing /
+        // Skip flags (g, i, m, s, u, y, d)
+        while (pos < source.length && /[gimsuyfd]/.test(source[pos])) {
+          pos++
+        }
+        tokens.push({ type: 'Other', value: source.slice(start, pos), start, end: pos })
+        continue
+      }
+    }
+
+    // String literals
+    if (char === '"' || char === "'") {
+      const quote = char
+      pos++
+      while (pos < source.length && source[pos] !== quote) {
+        if (source[pos] === '\\') {
+          pos += 2 // Skip escape sequence
+        } else {
+          pos++
+        }
+      }
+      pos++ // Skip closing quote
+      tokens.push({ type: 'StringLiteral', value: source.slice(start, pos), start, end: pos })
+      continue
+    }
+
+    // Template literals
+    if (char === '`') {
+      pos++
+      while (pos < source.length && source[pos] !== '`') {
+        if (source[pos] === '\\') {
+          pos += 2 // Skip escape sequence
+        } else if (source[pos] === '$' && source[pos + 1] === '{') {
+          // Template expression - skip to matching }
+          pos += 2
+          let depth = 1
+          while (pos < source.length && depth > 0) {
+            if (source[pos] === '{') depth++
+            else if (source[pos] === '}') depth--
+            else if (source[pos] === '`') {
+              // Nested template literal - recursively handle
+              pos++
+              while (pos < source.length && source[pos] !== '`') {
+                if (source[pos] === '\\') pos += 2
+                else pos++
+              }
+            } else if (source[pos] === '"' || source[pos] === "'") {
+              // String in template expression
+              const q = source[pos]
+              pos++
+              while (pos < source.length && source[pos] !== q) {
+                if (source[pos] === '\\') pos += 2
+                else pos++
+              }
+            }
+            pos++
+          }
+        } else {
+          pos++
+        }
+      }
+      pos++ // Skip closing backtick
+      tokens.push({ type: 'TemplateLiteral', value: source.slice(start, pos), start, end: pos })
+      continue
+    }
+
+    // Identifiers (including keywords)
+    if (isIdentifierStart(char)) {
+      while (pos < source.length && isIdentifierPart(source[pos])) {
+        pos++
+      }
+      tokens.push({ type: 'IdentifierName', value: source.slice(start, pos), start, end: pos })
+      continue
+    }
+
+    // Punctuators and operators
+    if (isPunctuator(char)) {
+      // Handle multi-character operators
+      const twoChar = source.slice(pos, pos + 2)
+      const threeChar = source.slice(pos, pos + 3)
+
+      if (
+        threeChar === '===' || threeChar === '!==' || threeChar === '>>>' ||
+        threeChar === '...' || threeChar === '**='
+      ) {
+        pos += 3
+      } else if (
+        twoChar === '==' || twoChar === '!=' || twoChar === '<=' || twoChar === '>=' ||
+        twoChar === '&&' || twoChar === '||' || twoChar === '++' || twoChar === '--' ||
+        twoChar === '+=' || twoChar === '-=' || twoChar === '*=' || twoChar === '/=' ||
+        twoChar === '=>' || twoChar === '<<' || twoChar === '>>' || twoChar === '??' ||
+        twoChar === '?.' || twoChar === '<-'
+      ) {
+        pos += 2
+      } else {
+        pos++
+      }
+      tokens.push({ type: 'Punctuator', value: source.slice(start, pos), start, end: pos })
+      continue
+    }
+
+    // Numbers
+    if (isDigit(char) || (char === '.' && isDigit(source[pos + 1]))) {
+      while (
+        pos < source.length &&
+        (isDigit(source[pos]) || source[pos] === '.' || source[pos] === 'e' || source[pos] === 'E' ||
+          source[pos] === '_')
+      ) {
+        if ((source[pos] === 'e' || source[pos] === 'E') && (source[pos + 1] === '+' || source[pos + 1] === '-')) {
+          pos += 2
+        } else {
+          pos++
+        }
+      }
+      // Handle BigInt suffix
+      if (source[pos] === 'n') pos++
+      tokens.push({ type: 'Other', value: source.slice(start, pos), start, end: pos })
+      continue
+    }
+
+    // Anything else
+    pos++
+    tokens.push({ type: 'Other', value: source.slice(start, pos), start, end: pos })
   }
 
   return tokens
+}
+
+function isIdentifierStart(char: string): boolean {
+  return /[a-zA-Z_$]/.test(char)
+}
+
+function isIdentifierPart(char: string): boolean {
+  return /[a-zA-Z0-9_$]/.test(char)
+}
+
+function isDigit(char: string): boolean {
+  return /[0-9]/.test(char)
+}
+
+function isPunctuator(char: string): boolean {
+  return /[{}()[\];:,.<>?!+\-*/%=&|^~@#]/.test(char)
 }
 
 /**
@@ -55,13 +330,13 @@ export function hasGenBlocks(source: string): boolean {
 /**
  * Find all gen {} blocks in source using token-based parsing
  */
-export function findGenBlocks(source: string): GenBlock[] {
+export function findGenBlocks(source: string): Array<GenBlock> {
   if (!hasGenBlocks(source)) {
     return []
   }
 
   const tokens = tokenize(source)
-  const blocks: GenBlock[] = []
+  const blocks: Array<GenBlock> = []
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i]
@@ -130,7 +405,7 @@ export function findGenBlocks(source: string): GenBlock[] {
  * We want to transform binds inside control flow (if/else/try/catch)
  * but NOT inside nested functions/callbacks (different scope)
  */
-function isInsideNestedFunction(tokens: TokenWithPosition[], upToIndex: number): boolean {
+function isInsideNestedFunction(tokens: Array<Token>, upToIndex: number): boolean {
   // Look for function or arrow function patterns before the current position
   // Track depth to find if we're inside a function body
   let functionDepth = 0
@@ -178,7 +453,7 @@ function isInsideNestedFunction(tokens: TokenWithPosition[], upToIndex: number):
  * Transform gen block content to Effect.gen body
  *
  * Transforms:
- * - `x <- expr` → `const x = yield* expr` (anywhere except inside nested functions)
+ * - `x <- expr` -> `const x = yield* expr` (anywhere except inside nested functions)
  *
  * Does NOT transform:
  * - let/const declarations (preserves them as-is)
@@ -187,7 +462,7 @@ function isInsideNestedFunction(tokens: TokenWithPosition[], upToIndex: number):
 export function transformBlockContent(content: string): string {
   const tokens = tokenize(content)
   const lines = content.split('\n')
-  const outputLines: string[] = []
+  const outputLines: Array<string> = []
 
   let lineStart = 0
 
@@ -203,13 +478,14 @@ export function transformBlockContent(content: string): string {
     }
 
     // Check if this line is inside a nested function/callback
-    const firstTokenIndex = tokens.findIndex(t => t.start >= lineStart && t.start < lineEnd)
+    const firstTokenIndex = tokens.findIndex((t) => t.start >= lineStart && t.start < lineEnd)
     const insideNestedFunction = firstTokenIndex >= 0 ? isInsideNestedFunction(tokens, firstTokenIndex) : false
 
     // Transform bind statements unless inside a nested function
     if (!insideNestedFunction) {
       // Look for pattern: identifier <- expression
-      const bindMatch = trimmed.match(/^(\w+)\s*<-\s*(.+)$/)
+      // Supports: simple vars (x), array destructuring ([a, b]), object destructuring ({ a, b })
+      const bindMatch = trimmed.match(/^(\w+|\[[\w\s,]+\]|\{[\w\s,:]+\})\s*<-\s*(.+)$/)
 
       if (bindMatch) {
         const [, varName, exprWithSemi] = bindMatch

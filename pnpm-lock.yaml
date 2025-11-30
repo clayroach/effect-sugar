@@ -25,13 +25,6 @@ importers:
         version: 1.6.1(@types/node@20.19.25)
 
   packages/vite-plugin:
-    dependencies:
-      js-tokens:
-        specifier: ^9.0.1
-        version: 9.0.1
-      magic-string:
-        specifier: ^0.30.5
-        version: 0.30.21
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
