@@ -1,4 +1,4 @@
-# effect-sugar - gen blocks for Effect-TS
+# effect-sugar - tools for gen blocks for Effect-TS
 
 Syntactic sugar for [Effect-TS](https://effect.website/) with for-comprehension style `gen` blocks.
 
