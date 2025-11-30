@@ -92,7 +92,7 @@ export default function effectSugarPlugin(
 
       return {
         code: result.code,
-        map: sourcemap ? result.map : null
+        map: sourcemap ? result.map as any : null
       }
     }
   }
