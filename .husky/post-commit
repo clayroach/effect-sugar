@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+# Link commit to gist
+if [ -f /tmp/claude-session-gist-url ]; then
+  GIST_URL=$(cat /tmp/claude-session-gist-url | sed 's/Claude-Session: //')
+  rm -f /tmp/claude-session-gist-url
+  [ -n "$GIST_URL" ] && claude-session link-commit --gist "$GIST_URL" 2>/dev/null
+fi

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+
+# Skip for merge/squash/amend
+if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "squash" ] || [ -n "$3" ]; then
+  exit 0
+fi
+
+# Create gist and save URL
+GIST_TRAILER=$(claude-session gist --commit --since last-commit 2>/dev/null | grep "^Claude-Session:" | tail -1)
+
+if [ -n "$GIST_TRAILER" ]; then
+  echo "" >> "$COMMIT_MSG_FILE"
+  echo "$GIST_TRAILER" >> "$COMMIT_MSG_FILE"
+  echo "$GIST_TRAILER" > /tmp/claude-session-gist-url
+fi
