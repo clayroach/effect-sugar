@@ -2,7 +2,7 @@
   "compilerOptions": {
     "module": "commonjs",
     "target": "ES2020",
-    "outDir": "target",
+    "outDir": "dist",
     "lib": ["ES2020"],
     "sourceMap": true,
     "strict": true,
@@ -10,5 +10,5 @@
     "skipLibCheck": true
   },
   "include": ["src/**/*", "ts-plugin/src/**/*"],
-  "exclude": ["node_modules", ".vscode-test", "target", "ts-plugin/node_modules"]
+  "exclude": ["node_modules", ".vscode-test", "dist", "ts-plugin/node_modules"]
 }

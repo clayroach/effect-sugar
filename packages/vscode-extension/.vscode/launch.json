@@ -7,11 +7,12 @@
       "request": "launch",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "${workspaceFolder}/../examples"
+        "${workspaceFolder}/../../examples"
       ],
       "outFiles": [
-        "${workspaceFolder}/target/**/*.js"
+        "${workspaceFolder}/dist/**/*.js"
       ],
+      "sourceMaps": true,
       "preLaunchTask": "${defaultBuildTask}"
     }
   ]

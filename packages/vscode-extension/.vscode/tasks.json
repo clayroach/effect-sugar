@@ -5,7 +5,7 @@
       "label": "compile",
       "type": "shell",
       "command": "pnpm",
-      "args": ["run", "compile"],
+      "args": ["run", "build"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -19,7 +19,7 @@
       "label": "watch",
       "type": "shell",
       "command": "pnpm",
-      "args": ["run", "watch"],
+      "args": ["run", "dev"],
       "group": "build",
       "presentation": {
         "reveal": "silent"

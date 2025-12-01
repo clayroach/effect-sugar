@@ -18,7 +18,7 @@
     "onLanguage:typescript",
     "onLanguage:typescriptreact"
   ],
-  "main": "./target/src/extension.js",
+  "main": "./dist/src/extension.js",
   "typescriptServerPlugins": [
     {
       "name": "effect-sugar-ts-plugin",
@@ -69,13 +69,13 @@
   },
   "scripts": {
     "build": "tsc -p ./ && pnpm run postcompile",
-    "postcompile": "mkdir -p ../../examples/node_modules/effect-sugar-ts-plugin && cp -r target/ts-plugin/* ../../examples/node_modules/effect-sugar-ts-plugin/ && cp ts-plugin/package.json ../../examples/node_modules/effect-sugar-ts-plugin/",
+    "postcompile": "mkdir -p node_modules/effect-sugar-ts-plugin && cp -r dist/ts-plugin/* node_modules/effect-sugar-ts-plugin/ && cp ts-plugin/package.json node_modules/effect-sugar-ts-plugin/ && mkdir -p ../../examples/node_modules/effect-sugar-ts-plugin && cp -r dist/ts-plugin/* ../../examples/node_modules/effect-sugar-ts-plugin/ && cp ts-plugin/package.json ../../examples/node_modules/effect-sugar-ts-plugin/",
     "dev": "tsc -watch -p ./",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf target ../../examples/node_modules/effect-sugar-ts-plugin",
+    "clean": "rm -rf dist node_modules/effect-sugar-ts-plugin ../../examples/node_modules/effect-sugar-ts-plugin",
     "vscode:prepublish": "pnpm run build",
-    "package": "mkdir -p ../../target && vsce package --out ../../target/ --no-dependencies",
-    "install-extension": "code --install-extension ../../target/effect-sugar-0.1.0.vsix"
+    "package": "mkdir -p ../../dist && vsce package --out ../../dist/ --no-dependencies",
+    "install-extension": "code --install-extension ../../dist/effect-sugar-0.1.0.vsix"
   },
   "dependencies": {
     "magic-string": "^0.30.5",
