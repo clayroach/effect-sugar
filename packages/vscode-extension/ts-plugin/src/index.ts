@@ -40,20 +40,6 @@ function create(info: PluginCreateInfo): ts.LanguageService {
 
   const ls = ts.createLanguageService(wrappedHost, ts.createDocumentRegistry())
 
-  function getPositionMapper(fileName: string) {
-    const state = getTransformState(fileName)
-    if (!state) {
-      return null
-    }
-
-    const result = transformSourceSafe(state.original)
-    if (!result.hasChanges) {
-      return null
-    }
-
-    return result.positionMapper
-  }
-
   function filterDiagnostics(
     fileName: string,
     diagnostics: ts.Diagnostic[],
@@ -115,12 +101,18 @@ function create(info: PluginCreateInfo): ts.LanguageService {
       // Hover information
       if (prop === 'getQuickInfoAtPosition') {
         return (fileName: string, position: number): ts.QuickInfo | undefined => {
-          const positionMapper = getPositionMapper(fileName)
+          const state = getTransformState(fileName)
 
-          if (!positionMapper) {
+          if (!state) {
             return target.getQuickInfoAtPosition(fileName, position)
           }
 
+          const result = transformSourceSafe(state.original)
+          if (!result.hasChanges) {
+            return target.getQuickInfoAtPosition(fileName, position)
+          }
+
+          const positionMapper = result.positionMapper
           const mappedPosition = positionMapper.originalToTransformed(position)
           const info = target.getQuickInfoAtPosition(fileName, mappedPosition)
 
@@ -150,12 +142,18 @@ function create(info: PluginCreateInfo): ts.LanguageService {
           position: number,
           options?: ts.GetCompletionsAtPositionOptions
         ): ts.CompletionInfo | undefined => {
-          const positionMapper = getPositionMapper(fileName)
+          const state = getTransformState(fileName)
 
-          if (!positionMapper) {
+          if (!state) {
             return target.getCompletionsAtPosition(fileName, position, options)
           }
 
+          const result = transformSourceSafe(state.original)
+          if (!result.hasChanges) {
+            return target.getCompletionsAtPosition(fileName, position, options)
+          }
+
+          const positionMapper = result.positionMapper
           const mappedPosition = positionMapper.originalToTransformed(position)
           const completions = target.getCompletionsAtPosition(fileName, mappedPosition, options)
 
@@ -190,41 +188,78 @@ function create(info: PluginCreateInfo): ts.LanguageService {
       // Go-to-definition (used by Cmd+Click)
       if (prop === 'getDefinitionAndBoundSpan') {
         return (fileName: string, position: number): ts.DefinitionInfoAndBoundSpan | undefined => {
-          const positionMapper = getPositionMapper(fileName)
+          const state = getTransformState(fileName)
 
-          if (!positionMapper) {
+          if (!state) {
             return target.getDefinitionAndBoundSpan(fileName, position)
           }
 
-          const mappedPosition = positionMapper.originalToTransformed(position)
-          const result = target.getDefinitionAndBoundSpan(fileName, mappedPosition)
+          const result = transformSourceSafe(state.original)
+          if (!result.hasChanges) {
+            return target.getDefinitionAndBoundSpan(fileName, position)
+          }
 
-          if (!result) {
+          const positionMapper = result.positionMapper
+
+          const mappedPosition = positionMapper.originalToTransformed(position)
+          const defResult = target.getDefinitionAndBoundSpan(fileName, mappedPosition)
+
+          if (!defResult) {
             return undefined
           }
 
-          // Map the textSpan back to original coordinates
-          const originalTextSpanStart = positionMapper.transformedToOriginal(result.textSpan.start)
+          // Map the textSpan (the highlighted text at click location) back to original coordinates
+          const originalTextSpanStart = positionMapper.transformedToOriginal(defResult.textSpan.start)
           const originalTextSpanEnd = positionMapper.transformedToOriginal(
-            result.textSpan.start + result.textSpan.length
+            defResult.textSpan.start + defResult.textSpan.length
           )
 
-          // Map definitions if they're in the same file
-          const mappedDefinitions = result.definitions?.map((def) => {
-            if (def.fileName === fileName) {
-              const origStart = positionMapper.transformedToOriginal(def.textSpan.start)
-              const origEnd = positionMapper.transformedToOriginal(
-                def.textSpan.start + def.textSpan.length
-              )
-              return {
-                ...def,
-                textSpan: {
-                  start: origStart,
-                  length: origEnd - origStart
-                }
-              }
+          // Map definition textSpans using a hybrid approach:
+          // TypeScript's sourceFile contains transformed source, so when it converts
+          // position→line/column, it uses transformed line lengths. To navigate correctly
+          // in the original source displayed in the editor, we need to:
+          // 1. Map transformed position → original position
+          // 2. Calculate original line/column
+          // 3. Find transformed position at that same line/column
+          // This ensures TypeScript's position→line/column gives the correct result.
+          const mappedDefinitions = defResult.definitions?.map((def) => {
+            // Only apply hybrid mapping to files we've transformed
+            const defState = getTransformState(def.fileName)
+            if (!defState) {
+              return def
             }
-            return def
+
+            const defResult = transformSourceSafe(defState.original)
+            if (!defResult.hasChanges) {
+              return def
+            }
+
+            const defMapper = defResult.positionMapper
+            const origSrc = defState.original
+            const transSrc = defState.transformed
+
+            const transformedSpan = def.textSpan
+
+            // Step 1: Map transformed position to original position
+            const originalPos = defMapper.transformedToOriginal(transformedSpan.start)
+
+            // Step 2: Calculate original line/column
+            const origLines = origSrc.slice(0, originalPos).split('\n')
+            const origLine = origLines.length
+            const origCol = origLines[origLines.length - 1]?.length ?? 0
+
+            // Step 3: Find the transformed position for that original line/column
+            const transLines = transSrc.split('\n')
+            let transPos = 0
+            for (let i = 0; i < origLine - 1 && i < transLines.length; i++) {
+              transPos += (transLines[i]?.length ?? 0) + 1 // +1 for newline
+            }
+            transPos += Math.min(origCol, transLines[origLine - 1]?.length ?? 0)
+
+            return {
+              ...def,
+              textSpan: { start: transPos, length: transformedSpan.length }
+            }
           })
 
           // Build result object conditionally to satisfy exactOptionalPropertyTypes
@@ -246,12 +281,18 @@ function create(info: PluginCreateInfo): ts.LanguageService {
       // Go-to-definition (alternative API)
       if (prop === 'getDefinitionAtPosition') {
         return (fileName: string, position: number): readonly ts.DefinitionInfo[] | undefined => {
-          const positionMapper = getPositionMapper(fileName)
+          const state = getTransformState(fileName)
 
-          if (!positionMapper) {
+          if (!state) {
             return target.getDefinitionAtPosition(fileName, position)
           }
 
+          const result = transformSourceSafe(state.original)
+          if (!result.hasChanges) {
+            return target.getDefinitionAtPosition(fileName, position)
+          }
+
+          const positionMapper = result.positionMapper
           const mappedPosition = positionMapper.originalToTransformed(position)
           const definitions = target.getDefinitionAtPosition(fileName, mappedPosition)
 
@@ -259,21 +300,44 @@ function create(info: PluginCreateInfo): ts.LanguageService {
             return undefined
           }
 
+          // Use the same hybrid mapping approach as getDefinitionAndBoundSpan
           return definitions.map((def) => {
-            if (def.fileName === fileName) {
-              const originalStart = positionMapper.transformedToOriginal(def.textSpan.start)
-              const originalEnd = positionMapper.transformedToOriginal(
-                def.textSpan.start + def.textSpan.length
-              )
-              return {
-                ...def,
-                textSpan: {
-                  start: originalStart,
-                  length: originalEnd - originalStart
-                }
-              }
+            const defState = getTransformState(def.fileName)
+            if (!defState) {
+              return def
             }
-            return def
+
+            const defResult = transformSourceSafe(defState.original)
+            if (!defResult.hasChanges) {
+              return def
+            }
+
+            const defMapper = defResult.positionMapper
+            const origSrc = defState.original
+            const transSrc = defState.transformed
+
+            const transformedSpan = def.textSpan
+
+            // Step 1: Map transformed position to original position
+            const originalPos = defMapper.transformedToOriginal(transformedSpan.start)
+
+            // Step 2: Calculate original line/column
+            const origLines = origSrc.slice(0, originalPos).split('\n')
+            const origLine = origLines.length
+            const origCol = origLines[origLines.length - 1]?.length ?? 0
+
+            // Step 3: Find the transformed position for that original line/column
+            const transLines = transSrc.split('\n')
+            let transPos = 0
+            for (let i = 0; i < origLine - 1 && i < transLines.length; i++) {
+              transPos += (transLines[i]?.length ?? 0) + 1 // +1 for newline
+            }
+            transPos += Math.min(origCol, transLines[origLine - 1]?.length ?? 0)
+
+            return {
+              ...def,
+              textSpan: { start: transPos, length: transformedSpan.length }
+            }
           })
         }
       }
@@ -281,12 +345,18 @@ function create(info: PluginCreateInfo): ts.LanguageService {
       // Type definition
       if (prop === 'getTypeDefinitionAtPosition') {
         return (fileName: string, position: number): readonly ts.DefinitionInfo[] | undefined => {
-          const positionMapper = getPositionMapper(fileName)
+          const state = getTransformState(fileName)
 
-          if (!positionMapper) {
+          if (!state) {
             return target.getTypeDefinitionAtPosition(fileName, position)
           }
 
+          const result = transformSourceSafe(state.original)
+          if (!result.hasChanges) {
+            return target.getTypeDefinitionAtPosition(fileName, position)
+          }
+
+          const positionMapper = result.positionMapper
           const mappedPosition = positionMapper.originalToTransformed(position)
           const typeDefs = target.getTypeDefinitionAtPosition(fileName, mappedPosition)
 
@@ -294,21 +364,44 @@ function create(info: PluginCreateInfo): ts.LanguageService {
             return undefined
           }
 
+          // Use the same hybrid mapping approach
           return typeDefs.map((def) => {
-            if (def.fileName === fileName) {
-              const originalStart = positionMapper.transformedToOriginal(def.textSpan.start)
-              const originalEnd = positionMapper.transformedToOriginal(
-                def.textSpan.start + def.textSpan.length
-              )
-              return {
-                ...def,
-                textSpan: {
-                  start: originalStart,
-                  length: originalEnd - originalStart
-                }
-              }
+            const defState = getTransformState(def.fileName)
+            if (!defState) {
+              return def
             }
-            return def
+
+            const defResult = transformSourceSafe(defState.original)
+            if (!defResult.hasChanges) {
+              return def
+            }
+
+            const defMapper = defResult.positionMapper
+            const origSrc = defState.original
+            const transSrc = defState.transformed
+
+            const transformedSpan = def.textSpan
+
+            // Step 1: Map transformed position to original position
+            const originalPos = defMapper.transformedToOriginal(transformedSpan.start)
+
+            // Step 2: Calculate original line/column
+            const origLines = origSrc.slice(0, originalPos).split('\n')
+            const origLine = origLines.length
+            const origCol = origLines[origLines.length - 1]?.length ?? 0
+
+            // Step 3: Find the transformed position for that original line/column
+            const transLines = transSrc.split('\n')
+            let transPos = 0
+            for (let i = 0; i < origLine - 1 && i < transLines.length; i++) {
+              transPos += (transLines[i]?.length ?? 0) + 1 // +1 for newline
+            }
+            transPos += Math.min(origCol, transLines[origLine - 1]?.length ?? 0)
+
+            return {
+              ...def,
+              textSpan: { start: transPos, length: transformedSpan.length }
+            }
           })
         }
       }
@@ -325,7 +418,7 @@ function create(info: PluginCreateInfo): ts.LanguageService {
   return proxy as ts.LanguageService
 }
 
-function init(modules: { typescript: typeof ts }) {
+function init(_modules: { typescript: typeof ts }) {
   return { create }
 }
 
