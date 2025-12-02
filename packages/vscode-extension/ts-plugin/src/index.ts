@@ -1,7 +1,68 @@
 /**
  * TypeScript Language Service Plugin for Effect Sugar
  *
- * Provides full IntelliSense support for gen { } blocks
+ * Provides full IntelliSense support for gen { } blocks by:
+ * 1. Transforming gen {} syntax to Effect.gen() before TypeScript parses it
+ * 2. Mapping positions bidirectionally between original and transformed source
+ * 3. Intercepting language service calls to provide correct positions
+ *
+ * ## Position Mapping Problem
+ *
+ * When we transform `gen { user <- getUser(id) }` to
+ * `Effect.gen(function* () { const user = yield* getUser(id) })`,
+ * the character positions change significantly:
+ *
+ * ```
+ * Original:    gen { user <- getUser(id) }
+ *                    ^--- position 6
+ *
+ * Transformed: Effect.gen(function* () { const user = yield* getUser(id) })
+ *                                              ^--- position 38
+ * ```
+ *
+ * ## The Hybrid Mapping Solution
+ *
+ * Simple position mapping (just converting positions) doesn't work correctly
+ * for go-to-definition because TypeScript's internal sourceFile contains the
+ * TRANSFORMED source. When VSCode asks "go to definition at position X":
+ *
+ * 1. We map X from original → transformed position
+ * 2. TypeScript finds the definition and returns a position in transformed source
+ * 3. We need to map that position back to original source
+ *
+ * BUT: TypeScript internally converts positions to line/column using the
+ * transformed source's line lengths. So if we just map the position back,
+ * TypeScript's line/column calculation will be wrong.
+ *
+ * The HYBRID approach fixes this:
+ * 1. Map transformed position → original position (to get original location)
+ * 2. Calculate original line/column from original source
+ * 3. Find a transformed position that, when TypeScript converts it to line/column
+ *    using transformed source, gives us the ORIGINAL line/column
+ *
+ * This ensures the cursor lands on the correct line AND column in the editor.
+ *
+ * ## Example
+ *
+ * ```typescript
+ * // Original source (displayed in editor):
+ * const program = gen {
+ *   user <- getUser(id)    // line 2, user at column 2
+ *   return user
+ * }
+ *
+ * // Transformed source (what TypeScript sees):
+ * const program = Effect.gen(function* () {
+ *   const user = yield* getUser(id)    // line 2, user at column 8
+ *   return user
+ * })
+ * ```
+ *
+ * When clicking on `user` in the return statement:
+ * - TypeScript returns definition at transformed position (column 8 on line 2)
+ * - We calculate: that maps to original position → line 2, column 2
+ * - We find: what transformed position gives line 2, column 2? → adjusted position
+ * - Result: cursor correctly lands at column 2 in the original source
  */
 
 import * as ts from 'typescript/lib/tsserverlibrary'
