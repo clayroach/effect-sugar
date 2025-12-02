@@ -47,9 +47,9 @@ importers:
 
   packages/vscode-extension:
     dependencies:
-      magic-string:
-        specifier: ^0.30.5
-        version: 0.30.21
+      effect-sugar-ts-plugin:
+        specifier: file:./ts-plugin
+        version: file:packages/vscode-extension/ts-plugin(typescript@5.9.3)
       prettier:
         specifier: ^3.0.0
         version: 3.6.2
@@ -931,6 +931,11 @@ packages:
 
   ecdsa-sig-formatter@1.0.11:
     resolution: {integrity: sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==}
+
+  effect-sugar-ts-plugin@file:packages/vscode-extension/ts-plugin:
+    resolution: {directory: packages/vscode-extension/ts-plugin, type: directory}
+    peerDependencies:
+      typescript: '>=4.9.0'
 
   effect@3.19.6:
     resolution: {integrity: sha512-Eh1E/CI+xCAcMSDC5DtyE29yWJINC0zwBbwHappQPorjKyS69rCA8qzpsHpfhKnPDYgxdg8zkknii8mZ+6YMQA==}
@@ -2705,6 +2710,11 @@ snapshots:
   ecdsa-sig-formatter@1.0.11:
     dependencies:
       safe-buffer: 5.2.1
+
+  effect-sugar-ts-plugin@file:packages/vscode-extension/ts-plugin(typescript@5.9.3):
+    dependencies:
+      magic-string: 0.30.21
+      typescript: 5.9.3
 
   effect@3.19.6:
     dependencies:

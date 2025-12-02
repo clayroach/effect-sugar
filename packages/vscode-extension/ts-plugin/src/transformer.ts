@@ -5,7 +5,6 @@
  * Builds segment mappings incrementally as transformations are applied.
  */
 
-import MagicString from 'magic-string'
 import {
   hasGenBlocks as scannerHasGenBlocks,
   findGenBlocks as scannerFindGenBlocks,

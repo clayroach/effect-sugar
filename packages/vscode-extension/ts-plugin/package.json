@@ -2,10 +2,10 @@
   "name": "effect-sugar-ts-plugin",
   "version": "0.1.0",
   "description": "TypeScript language service plugin for Effect-TS gen block syntax (bundled with VSCode extension)",
-  "main": "./src/index.js",
-  "types": "./src/index.d.ts",
+  "main": "./target/dist/index.js",
+  "types": "./target/dist/index.d.ts",
   "files": [
-    "src"
+    "target/dist"
   ],
   "scripts": {
     "build": "tsc",
@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf target/dist",
     "version:dev": "npm version --no-git-tag-version \"$(node -p \"require('./package.json').version.split('-')[0]\")-dev.$(date +%Y%m%d%H%M%S)\"",
-    "publish:dev": "pnpm build && pnpm version:dev && pnpm publish --registry http://localhost:4873 --no-git-checks && git checkout package.json"
+    "publish:dev": "pnpm build && pnpm version:dev && pnpm publish --registry http://localhost:4873 --no-git-checks && git checkout package.json",
+    "publish:local": "pnpm build && pnpm publish --registry http://localhost:4873 --no-git-checks"
   },
   "keywords": [
     "typescript",

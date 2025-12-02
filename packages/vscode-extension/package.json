@@ -19,13 +19,13 @@
     "onLanguage:typescriptreact"
   ],
   "main": "./target/src/extension.js",
-  "typescriptServerPlugins": [
-    {
-      "name": "effect-sugar-ts-plugin",
-      "enableForWorkspaceTypeScriptVersions": true
-    }
-  ],
   "contributes": {
+    "typescriptServerPlugins": [
+      {
+        "name": "effect-sugar-ts-plugin",
+        "enableForWorkspaceTypeScriptVersions": true
+      }
+    ],
     "languages": [
       {
         "id": "effect-sugar-typescript",
@@ -68,8 +68,8 @@
     }
   },
   "scripts": {
-    "build": "tsc -p ./ && pnpm run postcompile",
-    "postcompile": "mkdir -p ../../examples/node_modules/effect-sugar-ts-plugin && cp -r target/ts-plugin/* ../../examples/node_modules/effect-sugar-ts-plugin/ && cp ts-plugin/package.json ../../examples/node_modules/effect-sugar-ts-plugin/",
+    "build": "cd ts-plugin && pnpm build && cd .. && tsc -p ./",
+    "compile": "tsc -p ./",
     "dev": "tsc -watch -p ./",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf target ../../examples/node_modules/effect-sugar-ts-plugin",
@@ -78,7 +78,7 @@
     "install-extension": "code --install-extension ../../target/effect-sugar-0.1.0.vsix"
   },
   "dependencies": {
-    "magic-string": "^0.30.5",
+    "effect-sugar-ts-plugin": "file:./ts-plugin",
     "prettier": "^3.0.0"
   },
   "devDependencies": {
