@@ -2713,7 +2713,6 @@ snapshots:
 
   effect-sugar-ts-plugin@file:packages/vscode-extension/ts-plugin(typescript@5.9.3):
     dependencies:
-      magic-string: 0.30.21
       typescript: 5.9.3
 
   effect@3.19.6:
