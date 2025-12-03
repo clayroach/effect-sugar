@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "plugins": [
+      {
+        "name": "effect-sugar-ts-plugin"
+      }
+    ]
+  },
+  "include": ["*.ts"]
+}

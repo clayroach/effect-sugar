@@ -190,6 +190,67 @@ Example: `tmp/2025-11-24/VIRTUAL_FILE_APPROACH.md`
 
 See `~/.claude/CLAUDE.md` for global development principles (over-engineering, time estimates, git workflow, testing, etc.).
 
+## Position Mapping Architecture
+
+The ts-plugin uses @jridgewell/trace-mapping for accurate bidirectional position mapping between original (gen {}) and transformed (Effect.gen()) source code.
+
+**Key components:**
+- `packages/vscode-extension/ts-plugin/src/position-mapper.ts` - PositionMapper class using TraceMap
+- `packages/vscode-extension/ts-plugin/src/transformer.ts` - Source map generation via MagicString
+
+**How it works:**
+1. Transformer uses MagicString to apply code transformations
+2. MagicString generates VLQ source maps tracking all changes
+3. PositionMapper wraps TraceMap for efficient position lookups
+4. All IntelliSense features use the mapper (hover, completion, go-to-definition, syntax highlighting)
+
+**Why source maps instead of manual segment tracking?**
+- Industry standard for position mapping
+- Handles complex transformations accurately
+- Better than custom interpolation-based approaches
+- Powers all IDE features seamlessly
+
+## Debugging the VSCode Extension
+
+F5 debug workflow for plugin development:
+
+1. **Press F5** in VSCode (project root)
+2. **Automated steps run via tasks.json:**
+   - Builds ts-plugin (`pnpm run build`)
+   - Installs dependencies in examples/gen-block
+   - Launches new VSCode instance with examples/gen-block workspace
+   - Sets TSS_DEBUG=5667 to enable TypeScript server debugging
+   - Attaches debugger to port 5667
+
+3. **Set breakpoints** in `packages/vscode-extension/ts-plugin/src/*.ts`
+
+4. **Trigger in debug window:**
+   - Open basic.ts, hover over variables
+   - Use go-to-definition (Cmd+Click)
+   - Trigger auto-complete
+
+5. **After changes:**
+   - Stop debug (Shift+F5)
+   - Press F5 again to rebuild and relaunch
+   - OR in debug window: Cmd+Shift+P > "TypeScript: Restart TS Server"
+
+**Troubleshooting:**
+- Port 5667 in use: Change port in launch.json and TSS_DEBUG variable in tasks.json
+- Breakpoints not hit: Check outFiles path in launch.json
+- Plugin not loading: Verify build succeeded, check examples/gen-block/tsconfig.json plugins
+
+**Key files:**
+- `.vscode/launch.json` - Debug configuration
+- `.vscode/tasks.json` - Build and launch tasks
+- `examples/gen-block/` - Isolated debug workspace
+
+## Sync with language-service
+
+effect-sugar shares gen-block components with the language-service project. See `tmp/2025-12-02/SYNC_WITH_LANGUAGE_SERVICE.md` for:
+- Which components stay in sync
+- Sync workflow and frequency
+- History of adopted changes
+
 ## Project-Specific Testing
 
 ```bash

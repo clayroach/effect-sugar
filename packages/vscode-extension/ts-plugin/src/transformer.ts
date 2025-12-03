@@ -11,23 +11,18 @@ import {
   findGenBlocks as scannerFindGenBlocks,
   transformBlockContent as scannerTransformBlockContent
 } from './scanner.js'
-import {
-  createSegmentMapper,
-  createIdentityMapper,
-  Segment,
-  SegmentMapper
-} from './segment-mapper.js'
+import { PositionMapper, type SourceMapData } from './position-mapper.js'
 
 export interface TransformResult {
   transformed: string
   original: string
-  positionMapper: SegmentMapper
+  positionMapper: PositionMapper
   hasChanges: boolean
   genBlocks: Array<{ start: number; end: number }>
 }
 
 // Re-export for backwards compatibility
-export type PositionMapping = SegmentMapper
+export type PositionMapping = PositionMapper
 
 // Re-export scanner functions (with adapter for ts-plugin interface)
 export const hasGenBlocks = scannerHasGenBlocks
@@ -152,52 +147,33 @@ function parseLetStatement(line: string): ParsedLet | null {
   }
 }
 
-export function transformSource(source: string): TransformResult {
+export function transformSource(source: string, filename: string = 'unknown.ts'): TransformResult {
   if (!hasGenBlocks(source)) {
+    // Create identity mapper for unchanged source
+    const identityMap: SourceMapData = {
+      version: 3,
+      sources: [filename],
+      names: [],
+      mappings: ''
+    }
     return {
       transformed: source,
       original: source,
-      positionMapper: createIdentityMapper(source),
+      positionMapper: new PositionMapper(identityMap, filename, source, source),
       hasChanges: false,
       genBlocks: []
     }
   }
 
   const genBlocks = findGenBlocks(source)
-  const segments: Segment[] = []
+  const s = new MagicString(source)
 
-  // Build transformed source manually to track exact positions
-  let result = ''
-  let lastEnd = 0
-  let cumulativeOffset = 0 // How much the generated position differs from original
-
-  for (const block of genBlocks) {
-    // Copy content before this block
-    result += source.slice(lastEnd, block.start)
-
+  // Process each gen block using MagicString overwrite
+  for (const block of genBlocks.reverse()) {
     const openBracePos = source.indexOf('{', block.start)
 
     // 1. Transform "gen {" -> "Effect.gen(function* () {"
-    const genWrapperOrig = source.slice(block.start, openBracePos + 1)
-    const genWrapperNew = 'Effect.gen(function* () {'
-
-    const genWrapperOrigStart = block.start
-    const genWrapperOrigEnd = openBracePos + 1
-    const genWrapperGenStart = result.length
-
-    result += genWrapperNew
-
-    const genWrapperGenEnd = result.length
-
-    segments.push({
-      originalStart: genWrapperOrigStart,
-      originalEnd: genWrapperOrigEnd,
-      generatedStart: genWrapperGenStart,
-      generatedEnd: genWrapperGenEnd,
-      type: 'gen-wrapper'
-    })
-
-    cumulativeOffset = genWrapperGenEnd - genWrapperOrigEnd
+    s.overwrite(block.start, openBracePos + 1, 'Effect.gen(function* () {')
 
     // 2. Process content inside the block line by line
     const contentStart = openBracePos + 1
@@ -205,56 +181,22 @@ export function transformSource(source: string): TransformResult {
     const blockContent = source.slice(contentStart, contentEnd)
     const lines = blockContent.split('\n')
 
-    let lineOffset = contentStart // Position in original source
+    let lineOffset = contentStart
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i] ?? ''
-      const lineOrigStart = lineOffset
+      const lineStart = lineOffset
+      const lineEnd = lineOffset + line.length
 
       // Try to parse as bind statement
       const bindParsed = parseBindStatement(line)
       if (bindParsed) {
         // Transform: "  user <- getUser(1);" -> "  const user = yield* getUser(1);"
         const newLine = `${bindParsed.indent}const ${bindParsed.varName} = yield* ${bindParsed.expression}${bindParsed.hasSemicolon ? ';' : ''}`
+        s.overwrite(lineStart, lineEnd, newLine)
 
-        const lineGenStart = result.length
-        result += newLine
-
-        // Track variable name segment
-        // Original: indent + varName
-        // Generated: indent + "const " + varName
-        const origVarStart = lineOrigStart + bindParsed.varStart
-        const origVarEnd = lineOrigStart + bindParsed.varEnd
-        const genVarStart = lineGenStart + bindParsed.indent.length + 6 // "const "
-        const genVarEnd = genVarStart + bindParsed.varName.length
-
-        segments.push({
-          originalStart: origVarStart,
-          originalEnd: origVarEnd,
-          generatedStart: genVarStart,
-          generatedEnd: genVarEnd,
-          type: 'bind-var'
-        })
-
-        // Track expression segment
-        // Original: after "<- "
-        // Generated: after "= yield* "
-        const origExprStart = lineOrigStart + bindParsed.exprStart
-        const origExprEnd = origExprStart + bindParsed.expression.length
-        const genExprStart = genVarEnd + 10 // " = yield* "
-        const genExprEnd = genExprStart + bindParsed.expression.length
-
-        segments.push({
-          originalStart: origExprStart,
-          originalEnd: origExprEnd,
-          generatedStart: genExprStart,
-          generatedEnd: genExprEnd,
-          type: 'bind-expr'
-        })
-
-        lineOffset += line.length
+        lineOffset = lineEnd
         if (i < lines.length - 1) {
-          result += '\n'
           lineOffset += 1 // for newline
         }
         continue
@@ -265,86 +207,60 @@ export function transformSource(source: string): TransformResult {
       if (letParsed) {
         // Transform: "  let name = expr;" -> "  const name = expr;"
         const newLine = `${letParsed.indent}const ${letParsed.varName} = ${letParsed.expression}${letParsed.hasSemicolon ? ';' : ''}`
+        s.overwrite(lineStart, lineEnd, newLine)
 
-        const lineGenStart = result.length
-        result += newLine
-
-        // Track variable name segment
-        // Original: indent + "let " + varName
-        // Generated: indent + "const " + varName
-        const origVarStart = lineOrigStart + letParsed.varStart
-        const origVarEnd = lineOrigStart + letParsed.varEnd
-        const genVarStart = lineGenStart + letParsed.indent.length + 6 // "const "
-        const genVarEnd = genVarStart + letParsed.varName.length
-
-        segments.push({
-          originalStart: origVarStart,
-          originalEnd: origVarEnd,
-          generatedStart: genVarStart,
-          generatedEnd: genVarEnd,
-          type: 'let'
-        })
-
-        lineOffset += line.length
+        lineOffset = lineEnd
         if (i < lines.length - 1) {
-          result += '\n'
           lineOffset += 1
         }
         continue
       }
 
-      // Unchanged line - copy as-is
-      result += line
-      lineOffset += line.length
+      // Unchanged line - no overwrite needed
+      lineOffset = lineEnd
       if (i < lines.length - 1) {
-        result += '\n'
         lineOffset += 1
       }
     }
 
     // 3. Transform closing "}" -> "})"
-    const closeBraceOrigStart = block.end - 1
-    const closeBraceOrigEnd = block.end
-    const closeBraceGenStart = result.length
-
-    result += '})'
-
-    const closeBraceGenEnd = result.length
-
-    segments.push({
-      originalStart: closeBraceOrigStart,
-      originalEnd: closeBraceOrigEnd,
-      generatedStart: closeBraceGenStart,
-      generatedEnd: closeBraceGenEnd,
-      type: 'close-brace'
-    })
-
-    lastEnd = block.end
+    s.overwrite(block.end - 1, block.end, '})')
   }
 
-  // Copy any remaining content after the last block
-  result += source.slice(lastEnd)
+  const transformed = s.toString()
+  const sourceMap = s.generateMap({
+    source: filename,
+    includeContent: true,
+    hires: true
+  }) as SourceMapData
 
   return {
-    transformed: result,
+    transformed,
     original: source,
-    positionMapper: createSegmentMapper(source, result, segments),
-    hasChanges: result !== source,
+    positionMapper: new PositionMapper(sourceMap, filename, source, transformed),
+    hasChanges: true,
     genBlocks
   }
 }
 
-export function transformSourceSafe(source: string): TransformResult {
+export function transformSourceSafe(source: string, filename: string = 'unknown.ts'): TransformResult {
   try {
-    return transformSource(source)
+    return transformSource(source, filename)
   } catch (error) {
     const err = error as Error
     console.error('[effect-sugar] Transformation failed:', err.message)
 
+    const identityMap: SourceMapData = {
+      version: 3,
+      sources: [filename],
+      names: [],
+      mappings: ''
+    }
+
     return {
       transformed: source,
       original: source,
-      positionMapper: createIdentityMapper(source),
+      positionMapper: new PositionMapper(identityMap, filename, source, source),
       hasChanges: false,
       genBlocks: []
     }

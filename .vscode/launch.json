@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Gen-Block Examples",
+      "type": "node",
+      "request": "attach",
+      "protocol": "inspector",
+      "port": 5667,
+      "sourceMaps": true,
+      "preLaunchTask": "Prepare Debug Environment",
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": [
+        "${workspaceFolder}/packages/vscode-extension/ts-plugin/**/*.js"
+      ]
+    }
+  ]
+}
