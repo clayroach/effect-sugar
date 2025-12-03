@@ -17,7 +17,7 @@
     {
       "label": "Setup Examples Folder",
       "type": "shell",
-      "command": "cd examples/gen-block && pnpm install",
+      "command": "mkdir -p examples/gen-block/node_modules && cp -r packages/vscode-extension/ts-plugin examples/gen-block/node_modules/effect-sugar-ts-plugin && npm install --prefix examples/gen-block effect typescript",
       "presentation": {
         "echo": true,
         "reveal": "always",
