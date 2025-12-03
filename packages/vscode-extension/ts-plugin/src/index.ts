@@ -313,112 +313,11 @@ function create(info: PluginCreateInfo): ts.LanguageService {
         }
       }
 
-      // Semantic classification (encoded triplet format)
-      if (prop === 'getEncodedSemanticClassifications') {
-        return (
-          fileName: string,
-          span: ts.TextSpan,
-          format: ts.SemanticClassificationFormat
-        ) => {
-          const positionMapper = getPositionMapper(fileName)
-
-          if (!positionMapper) {
-            return target.getEncodedSemanticClassifications(fileName, span, format)
-          }
-
-          // Map span to transformed coordinates
-          const transformedStart = positionMapper.originalToTransformed(span.start)
-          const transformedEnd = positionMapper.originalToTransformed(span.start + span.length)
-          const mappedSpan = {
-            start: transformedStart,
-            length: transformedEnd - transformedStart
-          }
-
-          const classifications = target.getEncodedSemanticClassifications(
-            fileName,
-            mappedSpan,
-            format
-          )
-
-          // Map classification spans back to original
-          if (classifications.spans) {
-            const mappedSpans: number[] = []
-            // Encoded format: [start, length, classification] triplets
-            for (let i = 0; i < classifications.spans.length; i += 3) {
-              const start = classifications.spans[i] ?? 0
-              const length = classifications.spans[i + 1] ?? 0
-              const classification = classifications.spans[i + 2] ?? 0
-
-              const originalStart = positionMapper.transformedToOriginal(start)
-              const originalEnd = positionMapper.transformedToOriginal(start + length)
-              const mappedLength = Math.max(0, originalEnd - originalStart)
-
-              // Skip invalid spans
-              if (originalStart < 0 || mappedLength < 0) {
-                continue
-              }
-
-              mappedSpans.push(originalStart, mappedLength, classification)
-            }
-
-            return { ...classifications, spans: mappedSpans }
-          }
-
-          return classifications
-        }
-      }
-
-      // Semantic classification (object array format)
-      if (prop === 'getSemanticClassifications') {
-        return (
-          fileName: string,
-          span: ts.TextSpan,
-          format?: ts.SemanticClassificationFormat
-        ) => {
-          const positionMapper = getPositionMapper(fileName)
-
-          if (!positionMapper) {
-            return format !== undefined
-              ? target.getSemanticClassifications(fileName, span, format)
-              : target.getSemanticClassifications(fileName, span)
-          }
-
-          // Map span to transformed
-          const transformedStart = positionMapper.originalToTransformed(span.start)
-          const transformedEnd = positionMapper.originalToTransformed(span.start + span.length)
-          const mappedSpan = {
-            start: transformedStart,
-            length: transformedEnd - transformedStart
-          }
-
-          const classifications = format !== undefined
-            ? target.getSemanticClassifications(fileName, mappedSpan, format)
-            : target.getSemanticClassifications(fileName, mappedSpan)
-
-          // Map spans back to original
-          if (Array.isArray(classifications)) {
-            return classifications
-              .map((c: any) => {
-                const originalStart = positionMapper.transformedToOriginal(c.textSpan.start)
-                const originalEnd = positionMapper.transformedToOriginal(c.textSpan.start + c.textSpan.length)
-                const mappedLength = Math.max(0, originalEnd - originalStart)
-
-                // Skip invalid spans
-                if (originalStart < 0 || mappedLength < 0) {
-                  return null
-                }
-
-                return {
-                  ...c,
-                  textSpan: { start: originalStart, length: mappedLength }
-                }
-              })
-              .filter((c): c is NonNullable<typeof c> => c !== null)
-          }
-
-          return classifications
-        }
-      }
+      // Semantic classification - disabled for files with gen blocks
+      // The source map position mapping isn't precise enough for character-level
+      // token highlighting, causing misaligned colors. Grammar-based highlighting
+      // still works via TextMate rules.
+      // TODO: Implement more precise token-level position tracking for semantic highlighting
 
       const value = target[prop as keyof ts.LanguageService]
       if (typeof value === 'function') {
