@@ -45,7 +45,7 @@ importers:
         specifier: ^3.19.8
         version: 3.19.8
       effect-sugar-ts-plugin:
-        specifier: file:../../packages/vscode-extension/ts-plugin
+        specifier: workspace:*
         version: link:../../packages/vscode-extension/ts-plugin
       typescript:
         specifier: ^5.9.3
