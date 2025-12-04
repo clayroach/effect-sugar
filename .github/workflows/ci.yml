@@ -9,74 +9,102 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
+      # Skip actual CI on changeset version PRs - they only bump versions
+      - name: Skip for changesets
+        if: startsWith(github.head_ref, 'changeset-release/')
+        run: echo "Skipping CI for changeset release PR"
+
       - uses: actions/checkout@v4
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
 
       - name: Setup pnpm
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
 
       - name: Install dependencies
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         run: pnpm install
 
       - name: Build
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         run: pnpm run build
 
       - name: Typecheck
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         run: pnpm run typecheck
 
   test:
     runs-on: ubuntu-latest
     needs: build
-
     steps:
+      - name: Skip for changesets
+        if: startsWith(github.head_ref, 'changeset-release/')
+        run: echo "Skipping CI for changeset release PR"
+
       - uses: actions/checkout@v4
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
 
       - name: Setup pnpm
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
 
       - name: Install dependencies
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         run: pnpm install
 
       - name: Build
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         run: pnpm run build
 
       - name: Run unit tests
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         run: pnpm run test
 
   test-integration:
     runs-on: ubuntu-latest
     needs: build
-
     steps:
+      - name: Skip for changesets
+        if: startsWith(github.head_ref, 'changeset-release/')
+        run: echo "Skipping CI for changeset release PR"
+
       - uses: actions/checkout@v4
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
 
       - name: Setup pnpm
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
 
       - name: Install dependencies
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         run: pnpm install
 
       - name: Build
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         run: pnpm run build
 
       - name: Run integration tests
+        if: ${{ !startsWith(github.head_ref, 'changeset-release/') }}
         run: pnpm run test:integration
