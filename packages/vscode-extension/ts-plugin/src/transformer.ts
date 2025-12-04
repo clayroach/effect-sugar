@@ -1,282 +1,247 @@
 /**
- * Source Transformation Module
+ * Core transformation module for Effect-TS gen block syntax
  *
- * Handles transformation of gen { } blocks to Effect.gen() with precise position tracking.
- * Builds segment mappings incrementally as transformations are applied.
+ * Uses fine-grained MagicString operations to preserve source map positions
+ * for expression parts that don't change.
+ *
+ * Transforms:
+ *   gen {
+ *     user <- getUser(id)
+ *     let name = user.name
+ *     return { user, name }
+ *   }
+ *
+ * Into:
+ *   Effect.gen(function* () {
+ *     const user = yield* getUser(id)
+ *     let name = user.name
+ *     return { user, name }
+ *   })
+ *
+ * Note: Only bind arrows (x <- expr) are transformed to const.
+ * Regular let/const declarations are preserved as-is to avoid
+ * breaking nested callbacks that need reassignable variables.
+ *
+ * Position mapping strategy:
+ * - Only modify the parts that change (gen keyword, bind arrows)
+ * - Keep expression parts in place so their positions are preserved in source maps
  */
 
-import MagicString from 'magic-string'
-import {
-  hasGenBlocks as scannerHasGenBlocks,
-  findGenBlocks as scannerFindGenBlocks,
-  transformBlockContent as scannerTransformBlockContent
-} from './scanner.js'
-import { PositionMapper, type SourceMapData } from './position-mapper.js'
+import MagicString from "magic-string"
+import { findGenBlocks, type GenBlock, hasGenBlocks, transformBlockContent } from "./scanner"
+
+export { findGenBlocks, type GenBlock, hasGenBlocks, transformBlockContent }
 
 export interface TransformResult {
-  transformed: string
-  original: string
-  positionMapper: PositionMapper
+  code: string
+  map: ReturnType<MagicString["generateMap"]> | null
   hasChanges: boolean
-  genBlocks: Array<{ start: number; end: number }>
-}
-
-// Re-export for backwards compatibility
-export type PositionMapping = PositionMapper
-
-// Re-export scanner functions (with adapter for ts-plugin interface)
-export const hasGenBlocks = scannerHasGenBlocks
-
-export function findGenBlocks(
-  source: string
-): Array<{ start: number; end: number; blockContent: string }> {
-  // Use scanner's findGenBlocks and adapt to ts-plugin interface
-  const blocks = scannerFindGenBlocks(source)
-  return blocks.map(block => ({
-    start: block.start,
-    end: block.end,
-    blockContent: block.content
-  }))
+  /** The MagicString instance for source map generation */
+  magicString: MagicString | null
 }
 
 /**
- * Parse bind statement: "  user <- getUser(1);"
- * Returns positions relative to the statement start.
+ * Parse a bind statement and return its parts with positions
  */
-interface ParsedBind {
-  type: 'bind'
-  varName: string
-  expression: string
-  indent: string
-  // Positions relative to statement start
+interface BindStatement {
+  /** Start of variable name (relative to content start) */
   varStart: number
+  /** End of variable name (relative to content start) */
   varEnd: number
+  /** The variable name or pattern */
+  varName: string
+  /** Start of arrow (relative to content start) */
   arrowStart: number
+  /** End of arrow (relative to content start) */
   arrowEnd: number
+  /** Start of expression (relative to content start) */
   exprStart: number
+  /** End of expression (relative to content start) */
   exprEnd: number
+  /** Whether there's a trailing semicolon */
   hasSemicolon: boolean
-  fullLength: number
 }
 
 /**
- * Parse let statement: "  let name = expr;"
+ * Find bind statements in content with their positions
  */
-interface ParsedLet {
-  type: 'let'
-  varName: string
-  expression: string
-  indent: string
-  varStart: number
-  varEnd: number
-  hasSemicolon: boolean
-  fullLength: number
+function findBindStatements(content: string): Array<BindStatement> {
+  const statements: Array<BindStatement> = []
+  const lines = content.split("\n")
+  let pos = 0
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+
+    // Match bind pattern: identifier <- expression
+    // Supports: simple vars (x), array destructuring ([a, b]), object destructuring ({ a, b })
+    const match = trimmed.match(/^(\w+|\[[\w\s,]+\]|\{[\w\s,:]+\})\s*<-\s*(.+)$/)
+
+    if (match) {
+      const indent = line.match(/^\s*/)?.[0] || ""
+      const varName = match[1]
+      const expr = match[2]
+
+      // Calculate positions
+      const varStart = pos + indent.length
+      const varEnd = varStart + varName.length
+
+      // Find arrow position
+      const arrowIdx = line.indexOf("<-")
+      const arrowStart = pos + arrowIdx
+      const arrowEnd = arrowStart + 2
+
+      // Find expression start (after arrow and any whitespace)
+      const afterArrow = line.slice(arrowIdx + 2)
+      const exprStartOffset = afterArrow.length - afterArrow.trimStart().length
+      const exprStart = arrowEnd + exprStartOffset
+
+      // Expression end (handle semicolon)
+      const hasSemicolon = expr.trimEnd().endsWith(";")
+      const exprEnd = pos + line.trimEnd().length - (hasSemicolon ? 1 : 0)
+
+      statements.push({
+        varStart,
+        varEnd,
+        varName,
+        arrowStart,
+        arrowEnd,
+        exprStart,
+        exprEnd,
+        hasSemicolon
+      })
+    }
+
+    pos += line.length + 1 // +1 for newline
+  }
+
+  return statements
 }
 
-type ParsedStatement = ParsedBind | ParsedLet | { type: 'other'; content: string }
+/**
+ * Check if a position in the content is inside a nested function/callback
+ */
+function isPositionInsideNestedFunction(content: string, position: number): boolean {
+  const before = content.slice(0, position)
+  let functionDepth = 0
+  let i = 0
 
-function parseBindStatement(line: string): ParsedBind | null {
-  const trimmed = line.trim()
-  const match = trimmed.match(/^(\w+)\s*(<-)\s*(.+)$/)
-  if (!match) return null
+  while (i < before.length) {
+    // Check for 'function' keyword
+    if (before.slice(i).startsWith("function")) {
+      const braceIdx = before.indexOf("{", i)
+      if (braceIdx !== -1 && braceIdx < position) {
+        functionDepth++
+      }
+      i += 8
+      continue
+    }
 
-  const varName = match[1]
-  const exprWithSemi = match[3]
-  if (!varName || !exprWithSemi) return null
+    // Check for arrow function =>
+    if (before.slice(i).startsWith("=>")) {
+      const afterArrow = before.slice(i + 2)
+      const braceMatch = afterArrow.match(/^\s*\{/)
+      if (braceMatch) {
+        functionDepth++
+      }
+      i += 2
+      continue
+    }
 
-  const indent = line.match(/^\s*/)?.[0] || ''
-  const hasSemicolon = exprWithSemi.trimEnd().endsWith(';')
-  const expression = exprWithSemi.replace(/;?\s*$/, '')
+    // Track closing braces
+    if (before[i] === "}" && functionDepth > 0) {
+      functionDepth--
+    }
 
-  const varStart = indent.length
-  const varEnd = varStart + varName.length
-  const arrowStart = line.indexOf('<-')
-  const arrowEnd = arrowStart + 2
-
-  // Find expression start (after arrow and whitespace)
-  let exprStart = arrowEnd
-  while (exprStart < line.length) {
-    const char = line[exprStart]
-    if (!char || !/\s/.test(char)) break
-    exprStart++
+    i++
   }
-  const exprEnd = hasSemicolon ? line.length - 1 : line.length
 
-  return {
-    type: 'bind',
-    varName,
-    expression,
-    indent,
-    varStart,
-    varEnd,
-    arrowStart,
-    arrowEnd,
-    exprStart,
-    exprEnd,
-    hasSemicolon,
-    fullLength: line.length
-  }
+  return functionDepth > 0
 }
 
-function parseLetStatement(line: string): ParsedLet | null {
-  const trimmed = line.trim()
-  const match = trimmed.match(/^let\s+(\w+)\s*=\s*(.+)$/)
-  if (!match) return null
-
-  const varName = match[1]
-  const exprWithSemi = match[2]
-  if (!varName || !exprWithSemi) return null
-
-  const indent = line.match(/^\s*/)?.[0] || ''
-  const hasSemicolon = exprWithSemi.trimEnd().endsWith(';')
-  const expression = exprWithSemi.replace(/;?\s*$/, '')
-
-  // "let " is 4 chars
-  const varStart = indent.length + 4
-  const varEnd = varStart + varName.length
-
-  return {
-    type: 'let',
-    varName,
-    expression,
-    indent,
-    varStart,
-    varEnd,
-    hasSemicolon,
-    fullLength: line.length
-  }
-}
-
-export function transformSource(source: string, filename: string = 'unknown.ts'): TransformResult {
+/**
+ * Transform source code containing gen blocks
+ *
+ * Uses fine-grained MagicString operations to preserve source map positions
+ * for expressions that don't change.
+ */
+export function transformSource(
+  source: string,
+  filename?: string
+): TransformResult {
   if (!hasGenBlocks(source)) {
-    // Create identity mapper for unchanged source
-    const identityMap: SourceMapData = {
-      version: 3,
-      sources: [filename],
-      names: [],
-      mappings: ''
-    }
-    return {
-      transformed: source,
-      original: source,
-      positionMapper: new PositionMapper(identityMap, filename, source, source),
-      hasChanges: false,
-      genBlocks: []
-    }
+    return { code: source, map: null, hasChanges: false, magicString: null }
   }
 
-  const genBlocks = findGenBlocks(source)
+  const blocks = findGenBlocks(source)
+  if (blocks.length === 0) {
+    return { code: source, map: null, hasChanges: false, magicString: null }
+  }
+
   const s = new MagicString(source)
 
-  // Process each gen block using MagicString overwrite
-  for (const block of genBlocks.reverse()) {
-    const openBracePos = source.indexOf('{', block.start)
-
-    // 1. Transform "gen {" -> "Effect.gen(function* () {"
-    s.overwrite(block.start, openBracePos + 1, 'Effect.gen(function* () {')
-
-    // 2. Process content inside the block line by line
-    const contentStart = openBracePos + 1
-    const contentEnd = block.end - 1
-    const blockContent = source.slice(contentStart, contentEnd)
-    const lines = blockContent.split('\n')
-
-    let lineOffset = contentStart
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i] ?? ''
-      const lineStart = lineOffset
-      const lineEnd = lineOffset + line.length
-
-      // Try to parse as bind statement
-      const bindParsed = parseBindStatement(line)
-      if (bindParsed) {
-        // Transform: "  user <- getUser(1);" -> "  const user = yield* getUser(1);"
-        const newLine = `${bindParsed.indent}const ${bindParsed.varName} = yield* ${bindParsed.expression}${bindParsed.hasSemicolon ? ';' : ''}`
-        s.overwrite(lineStart, lineEnd, newLine)
-
-        lineOffset = lineEnd
-        if (i < lines.length - 1) {
-          lineOffset += 1 // for newline
-        }
-        continue
-      }
-
-      // Try to parse as let statement
-      const letParsed = parseLetStatement(line)
-      if (letParsed) {
-        // Transform: "  let name = expr;" -> "  const name = expr;"
-        const newLine = `${letParsed.indent}const ${letParsed.varName} = ${letParsed.expression}${letParsed.hasSemicolon ? ';' : ''}`
-        s.overwrite(lineStart, lineEnd, newLine)
-
-        lineOffset = lineEnd
-        if (i < lines.length - 1) {
-          lineOffset += 1
-        }
-        continue
-      }
-
-      // Unchanged line - no overwrite needed
-      lineOffset = lineEnd
-      if (i < lines.length - 1) {
-        lineOffset += 1
-      }
-    }
-
-    // 3. Transform closing "}" -> "})"
-    s.overwrite(block.end - 1, block.end, '})')
+  // Process blocks from end to start to preserve positions
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const block = blocks[i]
+    transformBlock(s, source, block)
   }
 
-  const transformed = s.toString()
-  const sourceMap = s.generateMap({
-    source: filename,
+  const mapOptions: Parameters<MagicString["generateMap"]>[0] = {
     includeContent: true,
     hires: true
-  }) as SourceMapData
+  }
+  if (filename) {
+    mapOptions.source = filename
+    mapOptions.file = `${filename}.map`
+  }
 
   return {
-    transformed,
-    original: source,
-    positionMapper: new PositionMapper(sourceMap, filename, source, transformed),
+    code: s.toString(),
+    map: s.generateMap(mapOptions),
     hasChanges: true,
-    genBlocks
+    magicString: s
   }
 }
 
-export function transformSourceSafe(source: string, filename: string = 'unknown.ts'): TransformResult {
-  try {
-    return transformSource(source, filename)
-  } catch (error) {
-    const err = error as Error
-    console.error('[effect-sugar] Transformation failed:', err.message)
+/**
+ * Transform a single gen block using fine-grained operations
+ */
+function transformBlock(s: MagicString, source: string, block: GenBlock): void {
+  // 1. Replace "gen " (with trailing space) or "gen{" with the wrapper
+  //    "Effect.gen(/* __EFFECT_SUGAR__ */ function* () "
+  //    The opening brace { stays in place
+  s.overwrite(block.start, block.braceStart, "Effect.gen(/* __EFFECT_SUGAR__ */ function* () ")
 
-    const identityMap: SourceMapData = {
-      version: 3,
-      sources: [filename],
-      names: [],
-      mappings: ''
+  // 2. Transform bind statements inside the block
+  //    Only modify the parts that change, keeping expressions in place
+  const contentStart = block.braceStart + 1
+  const contentEnd = block.end - 1
+  const content = source.slice(contentStart, contentEnd)
+
+  const bindStatements = findBindStatements(content)
+
+  // Process bind statements from end to start (to preserve positions)
+  for (let i = bindStatements.length - 1; i >= 0; i--) {
+    const bind = bindStatements[i]
+
+    // Skip if inside a nested function
+    if (isPositionInsideNestedFunction(content, bind.varStart)) {
+      continue
     }
 
-    return {
-      transformed: source,
-      original: source,
-      positionMapper: new PositionMapper(identityMap, filename, source, source),
-      hasChanges: false,
-      genBlocks: []
-    }
-  }
-}
+    // Convert positions to absolute (in source)
+    const absVarStart = contentStart + bind.varStart
+    const absVarEnd = contentStart + bind.varEnd
+    const absExprStart = contentStart + bind.exprStart
 
-export function getTransformInfo(source: string): {
-  hasGenBlocks: boolean
-  genBlockCount: number
-  genBlocks: Array<{ start: number; end: number }>
-} {
-  const genBlocks = hasGenBlocks(source) ? findGenBlocks(source) : []
+    // Insert "const " before variable name
+    s.appendLeft(absVarStart, "const ")
 
-  return {
-    hasGenBlocks: genBlocks.length > 0,
-    genBlockCount: genBlocks.length,
-    genBlocks
+    // Replace from after variable to start of expression with " = yield* "
+    // This preserves the variable name and expression in their original positions
+    s.overwrite(absVarEnd, absExprStart, " = yield* ")
   }
+
+  // 3. Add closing paren after the block's closing brace
+  s.appendRight(block.end, ")")
 }
