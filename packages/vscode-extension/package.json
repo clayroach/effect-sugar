@@ -3,6 +3,7 @@
   "displayName": "Effect Sugar",
   "description": "Syntax highlighting and TypeScript support for Effect-TS gen blocks",
   "version": "0.1.0",
+  "private": true,
   "publisher": "atrim",
   "repository": {
     "type": "git",
