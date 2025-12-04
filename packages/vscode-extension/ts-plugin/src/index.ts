@@ -9,8 +9,77 @@ import {
   createWrappedLanguageServiceHost,
   type WrappedHostResult
 } from './language-service-host-wrapper.js'
-import { getPositionMapper } from './position-mapper.js'
+import { getPositionMapper, getOriginalSource } from './position-mapper.js'
 import { findGenBlocks } from './transformer.js'
+
+/**
+ * Information about a bind statement (<-) in the original source
+ */
+interface BindInfo {
+  /** Variable name or pattern */
+  varName: string
+  /** Expression being bound */
+  expression: string
+  /** Start position of the <- arrow (absolute in source) */
+  arrowStart: number
+  /** End position of the <- arrow (absolute in source) */
+  arrowEnd: number
+}
+
+/**
+ * Find bind statements in gen blocks with their arrow positions
+ */
+function findBindStatements(source: string): Array<BindInfo> {
+  const blocks = findGenBlocks(source)
+  const binds: Array<BindInfo> = []
+
+  for (const block of blocks) {
+    const contentStart = block.braceStart + 1
+    const content = block.content
+    const lines = content.split('\n')
+    let pos = 0
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+
+      // Match bind pattern: identifier <- expression
+      const match = trimmed.match(/^(\w+|\[[\w\s,]+\]|\{[\w\s,:]+\})\s*<-\s*(.+)$/)
+
+      if (match) {
+        const varName = match[1]
+        const expr = match[2]
+        if (!varName || !expr) {
+          pos += line.length + 1
+          continue
+        }
+
+        // Find arrow position in the line
+        const arrowIdx = line.indexOf('<-')
+        if (arrowIdx !== -1) {
+          const absArrowStart = contentStart + pos + arrowIdx
+          binds.push({
+            varName,
+            expression: expr.replace(/;?\s*$/, ''),
+            arrowStart: absArrowStart,
+            arrowEnd: absArrowStart + 2
+          })
+        }
+      }
+
+      pos += line.length + 1 // +1 for newline
+    }
+  }
+
+  return binds
+}
+
+/**
+ * Check if a position is on a <- arrow and return the bind info
+ */
+function getBindAtPosition(source: string, position: number): BindInfo | undefined {
+  const binds = findBindStatements(source)
+  return binds.find((bind) => position >= bind.arrowStart && position < bind.arrowEnd)
+}
 
 interface PluginCreateInfo {
   languageService: ts.LanguageService
@@ -126,6 +195,37 @@ function create(info: PluginCreateInfo): ts.LanguageService {
       // Hover information
       if (prop === 'getQuickInfoAtPosition') {
         return (fileName: string, position: number): ts.QuickInfo | undefined => {
+          // Check if hovering over a <- arrow in original source
+          const originalSource = getOriginalSource(fileName)
+          if (originalSource) {
+            const bindInfo = getBindAtPosition(originalSource, position)
+            if (bindInfo) {
+              // Return custom hover info for the <- operator
+              return {
+                kind: ts.ScriptElementKind.keyword,
+                kindModifiers: '',
+                textSpan: {
+                  start: bindInfo.arrowStart,
+                  length: 2
+                },
+                displayParts: [
+                  { text: 'const ', kind: 'keyword' },
+                  { text: bindInfo.varName, kind: 'localName' },
+                  { text: ' = ', kind: 'punctuation' },
+                  { text: 'yield', kind: 'keyword' },
+                  { text: '* ', kind: 'punctuation' },
+                  { text: bindInfo.expression, kind: 'text' }
+                ],
+                documentation: [
+                  {
+                    text: 'Bind operator - unwraps the Effect and binds the success value to the variable.',
+                    kind: 'text'
+                  }
+                ]
+              }
+            }
+          }
+
           const positionMapper = getPositionMapper(fileName)
 
           if (!positionMapper) {
