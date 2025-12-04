@@ -5,7 +5,7 @@
   "type": "module",
   "dependencies": {
     "effect": "^3.19.8",
-    "effect-sugar-ts-plugin": "file:../../packages/vscode-extension/ts-plugin",
+    "effect-sugar-ts-plugin": "workspace:*",
     "typescript": "^5.9.3"
   }
 }
