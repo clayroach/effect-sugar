@@ -46,7 +46,7 @@ importers:
         version: 3.19.8
       effect-sugar-ts-plugin:
         specifier: file:../../packages/vscode-extension/ts-plugin
-        version: file:packages/vscode-extension/ts-plugin(typescript@5.9.3)
+        version: link:../../packages/vscode-extension/ts-plugin
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -97,6 +97,25 @@ importers:
       '@vscode/vsce':
         specifier: ^2.22.0
         version: 2.32.0
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
+  packages/vscode-extension/ts-plugin:
+    dependencies:
+      '@jridgewell/trace-mapping':
+        specifier: ^0.3.20
+        version: 0.3.31
+      js-tokens:
+        specifier: ^9.0.1
+        version: 9.0.1
+      magic-string:
+        specifier: ^0.30.5
+        version: 0.30.21
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.25
       typescript:
         specifier: ^5.3.0
         version: 5.9.3
@@ -1121,11 +1140,6 @@ packages:
 
   ecdsa-sig-formatter@1.0.11:
     resolution: {integrity: sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==}
-
-  effect-sugar-ts-plugin@file:packages/vscode-extension/ts-plugin:
-    resolution: {directory: packages/vscode-extension/ts-plugin, type: directory}
-    peerDependencies:
-      typescript: '>=4.9.0'
 
   effect@3.19.6:
     resolution: {integrity: sha512-Eh1E/CI+xCAcMSDC5DtyE29yWJINC0zwBbwHappQPorjKyS69rCA8qzpsHpfhKnPDYgxdg8zkknii8mZ+6YMQA==}
@@ -3304,13 +3318,6 @@ snapshots:
   ecdsa-sig-formatter@1.0.11:
     dependencies:
       safe-buffer: 5.2.1
-
-  effect-sugar-ts-plugin@file:packages/vscode-extension/ts-plugin(typescript@5.9.3):
-    dependencies:
-      '@jridgewell/trace-mapping': 0.3.31
-      js-tokens: 9.0.1
-      magic-string: 0.30.21
-      typescript: 5.9.3
 
   effect@3.19.6:
     dependencies:
