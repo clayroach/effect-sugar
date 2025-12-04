@@ -41,7 +41,7 @@ const effectSugarPreprocessor: ESLintPreprocessor = {
   /**
    * Postprocess ESLint messages after linting
    */
-  postprocess(messages: Array<Array<object>>, filename: string): object[] {
+  postprocess(messages: Array<Array<object>>, _filename: string): object[] {
     // Return messages as-is - the transformation preserves line structure
     // so line numbers should still be accurate
     return messages.flat()

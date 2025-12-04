@@ -23,11 +23,17 @@
     "publish:dryrun:vite": "pnpm --filter effect-sugar-vite publish --dry-run --no-git-checks",
     "publish:dev": "pnpm publish:dev:vite",
     "publish:dev:vite": "pnpm --filter effect-sugar-vite publish:dev",
-    "package:vscode": "pnpm --filter effect-sugar run package"
+    "package:vscode": "pnpm --filter effect-sugar run package",
+    "setup:debug": "mkdir -p examples/gen-block/node_modules && cp -r packages/vscode-extension/ts-plugin examples/gen-block/node_modules/effect-sugar-ts-plugin && npm install --prefix examples/gen-block --silent effect typescript"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.0",
+    "@eslint/js": "^9.39.1",
+    "@typescript-eslint/eslint-plugin": "^8.48.1",
+    "@typescript-eslint/parser": "^8.48.1",
     "effect": "^3.0.0",
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0",
     "turbo": "^2.0.0",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"

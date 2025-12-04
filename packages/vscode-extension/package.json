@@ -68,8 +68,8 @@
     }
   },
   "scripts": {
-    "build": "tsc -p ./ && pnpm run postcompile",
-    "postcompile": "mkdir -p ../../examples/node_modules/effect-sugar-ts-plugin && cp -r target/ts-plugin/* ../../examples/node_modules/effect-sugar-ts-plugin/ && cp ts-plugin/package.json ../../examples/node_modules/effect-sugar-ts-plugin/",
+    "build": "cd ts-plugin && pnpm build && cd .. && tsc -p ./",
+    "postcompile": "echo 'Postcompile deprecated - use build script'",
     "dev": "tsc -watch -p ./",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf target ../../examples/node_modules/effect-sugar-ts-plugin",
