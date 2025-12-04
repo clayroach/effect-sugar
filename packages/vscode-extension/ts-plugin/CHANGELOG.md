@@ -1,5 +1,12 @@
 # effect-sugar-ts-plugin
 
+## 0.2.1
+
+### Patch Changes
+
+- a981a54: fix build of 0.2.0 release
+- 25d0eb7: fixing release process
+
 ## 0.2.0
 
 ### Minor Changes
