@@ -1,6 +1,6 @@
 {
   "name": "effect-sugar-ts-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TypeScript language service plugin for Effect-TS gen block syntax (bundled with VSCode extension)",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
