@@ -9,7 +9,7 @@ import {
   createWrappedLanguageServiceHost,
   type WrappedHostResult
 } from './language-service-host-wrapper.js'
-import { getOriginalSource, getTransformedSource, getPositionMapper } from './position-mapper.js'
+import { getPositionMapper } from './position-mapper.js'
 import { findGenBlocks } from './transformer.js'
 
 interface PluginCreateInfo {
@@ -17,7 +17,7 @@ interface PluginCreateInfo {
   languageServiceHost: ts.LanguageServiceHost
   project: ts.server.Project
   serverHost?: ts.server.ServerHost
-  config?: any
+  config?: Record<string, unknown>
 }
 
 function isInGenBlock(
@@ -42,8 +42,12 @@ function create(info: PluginCreateInfo): ts.LanguageService {
     })
 
     // Replace the host's getScriptSnapshot with our wrapped version
-    ;(info.languageServiceHost as any).getScriptSnapshot = (fileName: string) => {
-      return genBlockHostResult!.wrappedHost.getScriptSnapshot?.(fileName)
+    // We need to cast here because the TypeScript types don't allow reassignment
+    const mutableHost = info.languageServiceHost as {
+      getScriptSnapshot: ts.LanguageServiceHost['getScriptSnapshot']
+    }
+    mutableHost.getScriptSnapshot = (fileName: string) => {
+      return genBlockHostResult?.wrappedHost.getScriptSnapshot?.(fileName)
     }
 
     console.log('[effect-sugar] Gen-block transformation enabled')
@@ -92,7 +96,7 @@ function create(info: PluginCreateInfo): ts.LanguageService {
       if (!genBlockHostResult) {
         const value = target[prop as keyof ts.LanguageService]
         if (typeof value === 'function') {
-          return (value as Function).bind(target)
+          return (value as (...args: unknown[]) => unknown).bind(target)
         }
         return value
       }
@@ -384,9 +388,9 @@ function create(info: PluginCreateInfo): ts.LanguageService {
           let mappedSpan = span
           const isGenBlock = genBlockHostResult?.isTransformed(fileName)
 
-          if (isGenBlock) {
-            const transformedStart = genBlockHostResult!.mapToTransformed(fileName, span.start)
-            const transformedEnd = genBlockHostResult!.mapToTransformed(
+          if (isGenBlock && genBlockHostResult) {
+            const transformedStart = genBlockHostResult.mapToTransformed(fileName, span.start)
+            const transformedEnd = genBlockHostResult.mapToTransformed(
               fileName,
               span.start + span.length
             )
@@ -447,34 +451,13 @@ function create(info: PluginCreateInfo): ts.LanguageService {
           span: ts.TextSpan,
           format?: ts.SemanticClassificationFormat
         ): ts.ClassifiedSpan[] | ts.ClassifiedSpan2020[] {
-          // Helper to map a single classification span
-          const mapClassificationSpan = <T extends { textSpan: ts.TextSpan }>(
-            classification: T
-          ): T => {
-            const originalStart = genBlockHostResult!.mapToOriginal(
-              fileName,
-              classification.textSpan.start
-            )
-            const originalEnd = genBlockHostResult!.mapToOriginal(
-              fileName,
-              classification.textSpan.start + classification.textSpan.length
-            )
-            return {
-              ...classification,
-              textSpan: {
-                start: originalStart,
-                length: originalEnd - originalStart
-              }
-            }
-          }
-
           // Map span for gen-block files (original → transformed)
           let mappedSpan = span
           const isGenBlock = genBlockHostResult?.isTransformed(fileName)
 
-          if (isGenBlock) {
-            const transformedStart = genBlockHostResult!.mapToTransformed(fileName, span.start)
-            const transformedEnd = genBlockHostResult!.mapToTransformed(
+          if (isGenBlock && genBlockHostResult) {
+            const transformedStart = genBlockHostResult.mapToTransformed(fileName, span.start)
+            const transformedEnd = genBlockHostResult.mapToTransformed(
               fileName,
               span.start + span.length
             )
@@ -487,7 +470,28 @@ function create(info: PluginCreateInfo): ts.LanguageService {
           if (format !== undefined) {
             const classifications = target.getSemanticClassifications(fileName, mappedSpan, format)
 
-            if (isGenBlock) {
+            if (isGenBlock && genBlockHostResult) {
+              // Helper to map a single classification span
+              const mapClassificationSpan = <T extends { textSpan: ts.TextSpan }>(
+                classification: T
+              ): T => {
+                const originalStart = genBlockHostResult.mapToOriginal(
+                  fileName,
+                  classification.textSpan.start
+                )
+                const originalEnd = genBlockHostResult.mapToOriginal(
+                  fileName,
+                  classification.textSpan.start + classification.textSpan.length
+                )
+                return {
+                  ...classification,
+                  textSpan: {
+                    start: originalStart,
+                    length: originalEnd - originalStart
+                  }
+                }
+              }
+
               // Check if it's ClassifiedSpan2020[] by checking classificationType type
               const first = classifications[0]
               if (first && typeof first.classificationType === 'number') {
@@ -502,7 +506,28 @@ function create(info: PluginCreateInfo): ts.LanguageService {
           // Without format parameter, always returns ClassifiedSpan[]
           const classifications = target.getSemanticClassifications(fileName, mappedSpan)
 
-          if (isGenBlock) {
+          if (isGenBlock && genBlockHostResult) {
+            // Helper to map a single classification span
+            const mapClassificationSpan = <T extends { textSpan: ts.TextSpan }>(
+              classification: T
+            ): T => {
+              const originalStart = genBlockHostResult.mapToOriginal(
+                fileName,
+                classification.textSpan.start
+              )
+              const originalEnd = genBlockHostResult.mapToOriginal(
+                fileName,
+                classification.textSpan.start + classification.textSpan.length
+              )
+              return {
+                ...classification,
+                textSpan: {
+                  start: originalStart,
+                  length: originalEnd - originalStart
+                }
+              }
+            }
+
             return classifications.map(mapClassificationSpan)
           }
 
@@ -514,7 +539,7 @@ function create(info: PluginCreateInfo): ts.LanguageService {
 
       const value = target[prop as keyof ts.LanguageService]
       if (typeof value === 'function') {
-        return (value as Function).bind(target)
+        return (value as (...args: unknown[]) => unknown).bind(target)
       }
       return value
     }
@@ -524,7 +549,7 @@ function create(info: PluginCreateInfo): ts.LanguageService {
   return proxy as ts.LanguageService
 }
 
-function init(modules: { typescript: typeof ts }) {
+function init(_modules: { typescript: typeof ts }) {
   return { create }
 }
 

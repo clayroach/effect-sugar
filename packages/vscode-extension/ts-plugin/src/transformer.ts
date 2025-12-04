@@ -81,6 +81,10 @@ function findBindStatements(content: string): Array<BindStatement> {
       const indent = line.match(/^\s*/)?.[0] || ""
       const varName = match[1]
       const expr = match[2]
+      if (!varName || !expr) {
+        pos += line.length + 1
+        continue
+      }
 
       // Calculate positions
       const varStart = pos + indent.length
@@ -183,6 +187,7 @@ export function transformSource(
   // Process blocks from end to start to preserve positions
   for (let i = blocks.length - 1; i >= 0; i--) {
     const block = blocks[i]
+    if (!block) continue
     transformBlock(s, source, block)
   }
 
@@ -223,6 +228,7 @@ function transformBlock(s: MagicString, source: string, block: GenBlock): void {
   // Process bind statements from end to start (to preserve positions)
   for (let i = bindStatements.length - 1; i >= 0; i--) {
     const bind = bindStatements[i]
+    if (!bind) continue
 
     // Skip if inside a nested function
     if (isPositionInsideNestedFunction(content, bind.varStart)) {

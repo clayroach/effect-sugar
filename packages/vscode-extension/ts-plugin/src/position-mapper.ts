@@ -9,6 +9,7 @@
  */
 
 import { generatedPositionFor, originalPositionFor, TraceMap } from "@jridgewell/trace-mapping"
+import type { SourceMapInput } from "@jridgewell/trace-mapping"
 import type * as ts from "typescript"
 
 /**
@@ -53,7 +54,7 @@ export class PositionMapper {
     originalSource: string,
     transformedSource: string
   ) {
-    this.tracer = new TraceMap(sourceMap as any)
+    this.tracer = new TraceMap(sourceMap as SourceMapInput)
     this.filename = filename
     this.originalSource = originalSource
     this.transformedSource = transformedSource
@@ -64,9 +65,10 @@ export class PositionMapper {
    */
   private positionToLineColumn(source: string, pos: number): { line: number; column: number } {
     const lines = source.slice(0, pos).split("\n")
+    const lastLine = lines[lines.length - 1]
     return {
       line: lines.length,
-      column: lines[lines.length - 1].length
+      column: lastLine ? lastLine.length : 0
     }
   }
 
@@ -77,7 +79,8 @@ export class PositionMapper {
     const lines = source.split("\n")
     let pos = 0
     for (let i = 0; i < line - 1 && i < lines.length; i++) {
-      pos += lines[i].length + 1 // +1 for newline
+      const currentLine = lines[i]
+      pos += (currentLine ? currentLine.length : 0) + 1 // +1 for newline
     }
     return pos + column
   }
@@ -152,7 +155,7 @@ export function cacheTransformation(
   transformedSource: string,
   sourceMap: SourceMapData
 ): PositionMapper {
-  const tracer = new TraceMap(sourceMap as any)
+  const tracer = new TraceMap(sourceMap as SourceMapInput)
 
   transformCache.set(fileName, {
     originalSource,

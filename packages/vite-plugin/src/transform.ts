@@ -67,6 +67,7 @@ export function transformSource(
   // Process blocks from end to start to preserve positions
   for (let i = blocks.length - 1; i >= 0; i--) {
     const block = blocks[i]
+    if (!block) continue
 
     // Transform the block content
     const transformedContent = transformBlockContent(block.content)

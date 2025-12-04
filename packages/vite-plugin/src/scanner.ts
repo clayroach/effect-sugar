@@ -65,6 +65,7 @@ export function findGenBlocks(source: string): GenBlock[] {
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i]
+    if (!token) continue
 
     // Look for 'gen' identifier
     if (token.type !== 'IdentifierName' || token.value !== 'gen') {
@@ -75,6 +76,7 @@ export function findGenBlocks(source: string): GenBlock[] {
     let j = i + 1
     while (j < tokens.length) {
       const nextToken = tokens[j]
+      if (!nextToken) break
       if (
         nextToken.type !== 'WhiteSpace' &&
         nextToken.type !== 'LineTerminatorSequence' &&
@@ -89,7 +91,7 @@ export function findGenBlocks(source: string): GenBlock[] {
     // Check if it's followed by '{'
     if (j >= tokens.length) continue
     const braceToken = tokens[j]
-    if (braceToken.type !== 'Punctuator' || braceToken.value !== '{') {
+    if (!braceToken || braceToken.type !== 'Punctuator' || braceToken.value !== '{') {
       continue
     }
 
@@ -101,6 +103,7 @@ export function findGenBlocks(source: string): GenBlock[] {
 
     while (k < tokens.length && depth > 0) {
       const t = tokens[k]
+      if (!t) break
       if (t.type === 'Punctuator') {
         if (t.value === '{') depth++
         if (t.value === '}') depth--
@@ -110,6 +113,7 @@ export function findGenBlocks(source: string): GenBlock[] {
 
     if (depth === 0) {
       const endToken = tokens[k - 1]
+      if (!endToken) continue
       const end = endToken.end
       const content = source.slice(braceStart + 1, end - 1)
 
@@ -137,12 +141,14 @@ function isInsideNestedFunction(tokens: TokenWithPosition[], upToIndex: number):
 
   for (let i = 0; i < upToIndex; i++) {
     const t = tokens[i]
+    if (!t) continue
 
     // Check for function keyword or arrow
     if (t.type === 'IdentifierName' && t.value === 'function') {
       // Found 'function', next '{' starts a function body
       for (let j = i + 1; j < upToIndex; j++) {
-        if (tokens[j].type === 'Punctuator' && tokens[j].value === '{') {
+        const tok = tokens[j]
+        if (tok && tok.type === 'Punctuator' && tok.value === '{') {
           functionDepth++
           break
         }
@@ -154,6 +160,7 @@ function isInsideNestedFunction(tokens: TokenWithPosition[], upToIndex: number):
       // Look ahead for {
       for (let j = i + 1; j < upToIndex; j++) {
         const next = tokens[j]
+        if (!next) break
         if (next.type === 'Punctuator' && next.value === '{') {
           functionDepth++
           break
@@ -213,6 +220,7 @@ export function transformBlockContent(content: string): string {
 
       if (bindMatch) {
         const [, varName, exprWithSemi] = bindMatch
+        if (!varName || !exprWithSemi) continue
         const indent = line.match(/^\s*/)?.[0] || ''
         const hasSemicolon = exprWithSemi.trimEnd().endsWith(';')
         const expression = exprWithSemi.replace(/;?\s*$/, '')

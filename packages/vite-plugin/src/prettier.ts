@@ -29,7 +29,7 @@
  * ```
  */
 
-import { transformSource, hasGenBlocks, findGenBlocks } from './transform.js'
+import { transformSource, hasGenBlocks } from './transform.js'
 
 // ============================================================================
 // Reverse Transformation: Effect.gen() → gen {}
@@ -165,6 +165,7 @@ export function reverseTransformContent(content: string): string {
     const yieldMatch = trimmed.match(/^const\s+(\w+)\s*=\s*yield\s*\*\s*(.+)$/)
     if (yieldMatch) {
       const [, varName, expr] = yieldMatch
+      if (!varName || !expr) continue
       const cleanExpr = expr.replace(/;?\s*$/, '')
       const hasSemicolon = expr.trimEnd().endsWith(';')
       outputLines.push(`${indent}${varName} <- ${cleanExpr}${hasSemicolon ? ';' : ''}`)
@@ -176,6 +177,7 @@ export function reverseTransformContent(content: string): string {
     const constMatch = trimmed.match(/^const\s+(\w+)\s*=\s*(.+)$/)
     if (constMatch) {
       const [, varName, expr] = constMatch
+      if (!varName || !expr) continue
       // Check if this looks like it was a let statement (no yield*)
       if (!expr.includes('yield')) {
         const cleanExpr = expr.replace(/;?\s*$/, '')
@@ -210,6 +212,7 @@ export function reverseTransformSource(source: string): string {
   // Process from end to start to preserve positions
   for (let i = blocks.length - 1; i >= 0; i--) {
     const block = blocks[i]
+    if (!block) continue
     const reversedContent = reverseTransformContent(block.bodyContent)
     const replacement = `gen {${reversedContent}}`
     result = result.slice(0, block.start) + replacement + result.slice(block.end)
@@ -307,9 +310,13 @@ export function formatWithEffectSugarSync(
  * After formatting, use reverseTransformSource() to convert back.
  * For automatic round-trip formatting, use formatWithEffectSugar().
  */
+
+// Base parser properties (populated at runtime by Prettier)
+const baseParserProps: Record<string, unknown> = {}
+
 export const parsers = {
   'effect-sugar-typescript': {
-    ...({} as any), // Will be populated at runtime
+    ...baseParserProps,
     astFormat: 'estree',
     preprocess(text: string, options: PrettierOptions): string {
       if (!hasGenBlocks(text)) {

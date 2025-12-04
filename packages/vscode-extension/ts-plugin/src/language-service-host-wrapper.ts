@@ -235,7 +235,7 @@ export function createWrappedLanguageServiceHost(
 
       const value = target[prop as keyof ts.LanguageServiceHost]
       if (typeof value === 'function') {
-        return (value as Function).bind(target)
+        return (value as (...args: unknown[]) => unknown).bind(target)
       }
       return value
     }
