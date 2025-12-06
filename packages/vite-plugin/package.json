@@ -1,6 +1,6 @@
 {
   "name": "effect-sugar-vite",
-  "version": "0.3.0-dev.20251204221009",
+  "version": "0.3.0",
   "description": "Vite plugin for Effect-TS gen block syntax",
   "type": "module",
   "main": "./dist/index.js",
