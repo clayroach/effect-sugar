@@ -261,6 +261,59 @@ pnpm test
 pnpm test:integration
 ```
 
+## Release Process with Changesets
+
+This project uses changesets for automated versioning and releases:
+
+### 1. During Development (Feature Branch)
+
+Create a changeset when making changes that should be released:
+
+```bash
+# Interactive prompt to select packages and bump type (major/minor/patch)
+pnpm changeset
+
+# Or manually create .changeset/<slug>.md with format:
+# ---
+# "package-name": minor
+# "other-package": patch
+# ---
+# Description of changes for the changelog
+```
+
+Commit the changeset file as part of your feature branch PR.
+
+### 2. On Main Branch (Before Release)
+
+When PRs are merged to main and it's time to release:
+
+```bash
+# 1. Update package.json versions based on changesets
+pnpm changeset version
+
+# 2. Review the changes, build and test
+pnpm run build
+pnpm run test
+
+# 3. Publish all packages to npm
+pnpm changeset publish
+```
+
+This will:
+- Consume all changeset files
+- Update version numbers in each package.json
+- Generate changelog entries
+- Publish updated packages to npm registry
+
+### 3. Configuration
+
+- Changeset config: `.changeset/config.json`
+- Ignored packages (not published): `effect-sugar`, `gen-block-examples`
+- Base branch: `main`
+- Access: public
+
+**Note**: The `publish:dev` script publishes dev versions to local verdaccio for testing.
+
 ## Available Agents
 
 Located in `.claude/agents/`:
