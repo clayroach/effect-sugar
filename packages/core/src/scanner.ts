@@ -182,10 +182,73 @@ function isInsideNestedFunction(tokens: TokenWithPosition[], upToIndex: number):
 }
 
 /**
+ * Extract a binding pattern from the start of a trimmed line.
+ * Supports simple identifiers, array destructuring, and object destructuring.
+ *
+ * Returns the pattern and expression, or null if not a bind statement.
+ */
+export function extractBindPattern(trimmed: string): { pattern: string; expression: string } | null {
+  let pattern: string
+  let rest: string
+
+  if (trimmed.startsWith('[')) {
+    // Array destructuring - find matching ]
+    let depth = 0
+    let i = 0
+    for (; i < trimmed.length; i++) {
+      const char = trimmed[i]
+      if (char === '[') depth++
+      else if (char === ']') {
+        depth--
+        if (depth === 0) {
+          i++ // include the ]
+          break
+        }
+      }
+    }
+    if (depth !== 0) return null
+    pattern = trimmed.slice(0, i)
+    rest = trimmed.slice(i)
+  } else if (trimmed.startsWith('{')) {
+    // Object destructuring - find matching }
+    let depth = 0
+    let i = 0
+    for (; i < trimmed.length; i++) {
+      const char = trimmed[i]
+      if (char === '{') depth++
+      else if (char === '}') {
+        depth--
+        if (depth === 0) {
+          i++ // include the }
+          break
+        }
+      }
+    }
+    if (depth !== 0) return null
+    pattern = trimmed.slice(0, i)
+    rest = trimmed.slice(i)
+  } else {
+    // Simple identifier
+    const match = trimmed.match(/^(\w+)(.*)$/)
+    if (!match) return null
+    pattern = match[1]!
+    rest = match[2]!
+  }
+
+  // Check if rest starts with <- (with optional whitespace)
+  const arrowMatch = rest.match(/^\s*<-\s*(.+)$/)
+  if (!arrowMatch) return null
+
+  return { pattern, expression: arrowMatch[1]! }
+}
+
+/**
  * Transform gen block content to Effect.gen body
  *
  * Transforms:
  * - `x <- expr` → `const x = yield* expr` (anywhere except inside nested functions)
+ * - `[a, b] <- expr` → `const [a, b] = yield* expr` (array destructuring)
+ * - `{ x, y } <- expr` → `const { x, y } = yield* expr` (object destructuring)
  *
  * Does NOT transform:
  * - let/const declarations (preserves them as-is)
@@ -215,18 +278,16 @@ export function transformBlockContent(content: string): string {
 
     // Transform bind statements unless inside a nested function
     if (!insideNestedFunction) {
-      // Look for pattern: identifier <- expression
-      const bindMatch = trimmed.match(/^(\w+)\s*<-\s*(.+)$/)
+      const bindResult = extractBindPattern(trimmed)
 
-      if (bindMatch) {
-        const [, varName, exprWithSemi] = bindMatch
-        if (!varName || !exprWithSemi) continue
+      if (bindResult) {
+        const { pattern, expression: exprWithSemi } = bindResult
         const indent = line.match(/^\s*/)?.[0] || ''
         const hasSemicolon = exprWithSemi.trimEnd().endsWith(';')
         const expression = exprWithSemi.replace(/;?\s*$/, '')
 
         outputLines.push(
-          `${indent}const ${varName} = yield* ${expression}${hasSemicolon ? ';' : ''}`
+          `${indent}const ${pattern} = yield* ${expression}${hasSemicolon ? ';' : ''}`
         )
         lineStart = lineEnd + 1
         continue

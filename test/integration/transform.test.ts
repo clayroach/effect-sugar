@@ -9,7 +9,7 @@
 
 import { Effect } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { transformSource as transformSourceFull } from '../../packages/vite-plugin/target/dist/transform.js'
+import { transformSource as transformSourceFull } from '../../packages/vite-plugin/dist/transform.js'
 
 // Adapt the interface - vite-plugin returns { code, map, hasChanges }
 function transformSource(input: string): string {

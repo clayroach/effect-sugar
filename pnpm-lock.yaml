@@ -51,11 +51,27 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/vite-plugin:
+  packages/core:
     dependencies:
       js-tokens:
         specifier: ^9.0.1
         version: 9.0.1
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.25
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.0.0
+        version: 1.6.1(@types/node@20.19.25)
+
+  packages/vite-plugin:
+    dependencies:
+      '@effect-sugar/core':
+        specifier: workspace:*
+        version: link:../core
       magic-string:
         specifier: ^0.30.5
         version: 0.30.21
@@ -103,12 +119,12 @@ importers:
 
   packages/vscode-extension/ts-plugin:
     dependencies:
+      '@effect-sugar/core':
+        specifier: workspace:*
+        version: link:../../core
       '@jridgewell/trace-mapping':
         specifier: ^0.3.20
         version: 0.3.31
-      js-tokens:
-        specifier: ^9.0.1
-        version: 9.0.1
       magic-string:
         specifier: ^0.30.5
         version: 0.30.21
