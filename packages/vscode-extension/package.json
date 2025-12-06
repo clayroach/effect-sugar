@@ -79,6 +79,7 @@
     "install-extension": "code --install-extension ../../target/effect-sugar-0.1.0.vsix"
   },
   "dependencies": {
+    "effect-sugar-ts-plugin": "workspace:*",
     "magic-string": "^0.30.5",
     "prettier": "^3.0.0"
   },

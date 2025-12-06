@@ -28,7 +28,7 @@
  */
 
 import MagicString from "magic-string"
-import { findGenBlocks, type GenBlock, hasGenBlocks, transformBlockContent } from "./scanner"
+import { findGenBlocks, type GenBlock, hasGenBlocks, transformBlockContent, extractBindPattern } from "@effect-sugar/core"
 
 export { findGenBlocks, type GenBlock, hasGenBlocks, transformBlockContent }
 
@@ -64,6 +64,7 @@ interface BindStatement {
 
 /**
  * Find bind statements in content with their positions
+ * Uses extractBindPattern from core for consistent destructuring support
  */
 function findBindStatements(content: string): Array<BindStatement> {
   const statements: Array<BindStatement> = []
@@ -73,18 +74,12 @@ function findBindStatements(content: string): Array<BindStatement> {
   for (const line of lines) {
     const trimmed = line.trim()
 
-    // Match bind pattern: identifier <- expression
-    // Supports: simple vars (x), array destructuring ([a, b]), object destructuring ({ a, b })
-    const match = trimmed.match(/^(\w+|\[[\w\s,]+\]|\{[\w\s,:]+\})\s*<-\s*(.+)$/)
+    // Use core's extractBindPattern for consistent destructuring support
+    const bindResult = extractBindPattern(trimmed)
 
-    if (match) {
+    if (bindResult) {
       const indent = line.match(/^\s*/)?.[0] || ""
-      const varName = match[1]
-      const expr = match[2]
-      if (!varName || !expr) {
-        pos += line.length + 1
-        continue
-      }
+      const { pattern: varName, expression: expr } = bindResult
 
       // Calculate positions
       const varStart = pos + indent.length

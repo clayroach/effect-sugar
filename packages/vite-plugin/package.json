@@ -1,31 +1,35 @@
 {
   "name": "effect-sugar-vite",
-  "version": "0.2.0",
+  "version": "0.3.0-dev.20251204221009",
   "description": "Vite plugin for Effect-TS gen block syntax",
   "type": "module",
-  "main": "./target/dist/index.js",
-  "module": "./target/dist/index.js",
-  "types": "./target/dist/index.d.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./target/dist/index.js",
-      "types": "./target/dist/index.d.ts"
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./backend": {
+      "import": "./dist/backend.js",
+      "types": "./dist/backend.d.ts"
     },
     "./register": {
-      "import": "./target/dist/register.js",
-      "types": "./target/dist/register.d.ts"
+      "import": "./dist/register.js",
+      "types": "./dist/register.d.ts"
     },
     "./transform": {
-      "import": "./target/dist/transform.js",
-      "types": "./target/dist/transform.d.ts"
+      "import": "./dist/transform.js",
+      "types": "./dist/transform.d.ts"
     },
     "./eslint": {
-      "import": "./target/dist/eslint.js",
-      "types": "./target/dist/eslint.d.ts"
+      "import": "./dist/eslint.js",
+      "types": "./dist/eslint.d.ts"
     }
   },
   "files": [
-    "target/dist"
+    "dist"
   ],
   "scripts": {
     "build": "tsc",
@@ -33,7 +37,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf target/dist",
+    "clean": "rm -rf dist",
     "version:dev": "npm version --no-git-tag-version \"$(node -p \"require('./package.json').version.split('-')[0]\")-dev.$(date +%Y%m%d%H%M%S)\"",
     "publish:dev": "pnpm build && pnpm version:dev && pnpm publish --registry http://localhost:4873 --no-git-checks"
   },
@@ -63,7 +67,7 @@
     "vitest": "^1.0.0"
   },
   "dependencies": {
-    "js-tokens": "^9.0.1",
+    "@effect-sugar/core": "workspace:*",
     "magic-string": "^0.30.5"
   },
   "keywords": [
