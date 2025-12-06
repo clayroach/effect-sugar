@@ -97,6 +97,9 @@ importers:
 
   packages/vscode-extension:
     dependencies:
+      effect-sugar-ts-plugin:
+        specifier: workspace:*
+        version: link:ts-plugin
       magic-string:
         specifier: ^0.30.5
         version: 0.30.21
