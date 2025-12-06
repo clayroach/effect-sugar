@@ -261,13 +261,13 @@ pnpm test
 pnpm test:integration
 ```
 
-## Release Process with Changesets
+## Release Process with Changesets (Automated via GitHub Actions)
 
-This project uses changesets for automated versioning and releases:
+**IMPORTANT: This is fully automated. Do NOT manually run release commands locally.**
 
 ### 1. During Development (Feature Branch)
 
-Create a changeset when making changes that should be released:
+Create a changeset when your feature/fix is ready to be released:
 
 ```bash
 # Interactive prompt to select packages and bump type (major/minor/patch)
@@ -281,38 +281,50 @@ pnpm changeset
 # Description of changes for the changelog
 ```
 
-Commit the changeset file as part of your feature branch PR.
+Commit the changeset file(s) as part of your feature branch PR.
 
-### 2. On Main Branch (Before Release)
+### 2. Merge PR to Main
 
-When PRs are merged to main and it's time to release:
+When your PR is merged to main, the GitHub Actions release workflow (`.github/workflows/release.yml`) automatically:
 
-```bash
-# 1. Update package.json versions based on changesets
-pnpm changeset version
+1. **Detects changesets** in the repository
+2. **Creates a Release PR** that:
+   - Runs `pnpm changeset version` (bumps versions, generates changelogs)
+   - Commits all version changes with `chore: version packages`
+3. **Auto-merges the Release PR** back to main
+4. **On the second push to main** (from Release PR merge):
+   - Runs `pnpm run publish` which executes:
+     - `turbo run build` (full clean build)
+     - `changeset publish` (publishes to npm with NPM_TOKEN secret)
+   - Creates git tags for each published package
 
-# 2. Review the changes, build and test
-pnpm run build
-pnpm run test
+### 3. What NOT to Do
 
-# 3. Publish all packages to npm
-pnpm changeset publish
-```
+❌ **DO NOT run locally:**
+- `pnpm changeset version`
+- `pnpm changeset publish`
+- Manual version bumps
+- Manual npm publishes
 
-This will:
-- Consume all changeset files
-- Update version numbers in each package.json
-- Generate changelog entries
-- Publish updated packages to npm registry
+These are handled entirely by GitHub Actions using the `changesets/action@v1` workflow.
 
-### 3. Configuration
+### 4. Configuration
 
 - Changeset config: `.changeset/config.json`
 - Ignored packages (not published): `effect-sugar`, `gen-block-examples`
 - Base branch: `main`
 - Access: public
+- Release workflow: `.github/workflows/release.yml`
 
-**Note**: The `publish:dev` script publishes dev versions to local verdaccio for testing.
+**Secrets Required:**
+- `NPM_TOKEN`: npm authentication token
+- `CHANGESET_TOKEN`: GitHub token (for auto-merge of Release PR)
+
+**Local Alternative (Dev Releases Only):**
+```bash
+pnpm publish:dev          # Publish dev version to local registry
+pnpm publish:dryrun       # Dry-run without publishing
+```
 
 ## Available Agents
 
