@@ -7,5 +7,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": ["effect-sugar", "gen-block-examples"]
+  "ignore": ["effect-sugar", "gen-block-examples", "@effect-sugar/core"]
 }
