@@ -150,6 +150,7 @@ pnpm add -D effect-sugar-tsc ts-patch
 // tsconfig.json
 {
   "compilerOptions": {
+    "incremental": false,
     "plugins": [
       {
         "name": "effect-sugar-tsc",
@@ -164,6 +165,8 @@ pnpm add -D effect-sugar-tsc ts-patch
 **Flow:** `.ts` files → ts-patch intercepts getSourceFile → transforms `gen { }` → TypeScript parses valid code → compiles
 
 **How it works:** Uses a Program Transformer that wraps `CompilerHost.getSourceFile()` to transform source before TypeScript's parser sees it. This is necessary because `gen {}` is not valid TypeScript syntax.
+
+**Important:** `incremental: false` is required. The `transformProgram` option is incompatible with TypeScript's incremental compilation (BuilderProgram) because the transformed program doesn't preserve source file version information. Using `incremental: true` will cause: `"Debug Failure. Program intended to be used with Builder should have source files with versions set"`
 
 ### Option D: Preprocessor Script (Legacy)
 
