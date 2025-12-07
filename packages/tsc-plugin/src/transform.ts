@@ -28,6 +28,35 @@ import type {
 import type ts from 'typescript'
 import { transformSource, hasGenBlocks } from 'effect-sugar-core'
 
+/**
+ * Simple hash function for generating file versions.
+ * Used by TypeScript's incremental builder to detect file changes.
+ */
+function computeVersion(content: string): string {
+  let hash = 0
+  for (let i = 0; i < content.length; i++) {
+    const chr = content.charCodeAt(i)
+    hash = ((hash << 5) - hash) + chr
+    hash |= 0 // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36)
+}
+
+/**
+ * Ensures a source file has a version set for incremental compilation.
+ * TypeScript's BuilderProgram requires all source files to have version information.
+ */
+function ensureVersion<T extends { version?: string; text?: string }>(
+  sourceFile: T | undefined
+): T | undefined {
+  if (sourceFile && !sourceFile.version) {
+    ;(sourceFile as { version: string }).version = computeVersion(
+      sourceFile.text ?? ''
+    )
+  }
+  return sourceFile
+}
+
 const transformer: ProgramTransformer = (
   program: ts.Program,
   host: ts.CompilerHost | undefined,
@@ -50,45 +79,36 @@ const transformer: ProgramTransformer = (
       onError?: (message: string) => void,
       shouldCreateNewSourceFile?: boolean
     ): ts.SourceFile | undefined {
+      // Helper to get source file from original host with version ensured
+      const getOriginalSourceFile = () =>
+        ensureVersion(
+          originalHost.getSourceFile(
+            fileName,
+            languageVersionOrOptions,
+            onError,
+            shouldCreateNewSourceFile
+          )
+        )
+
       // Only process .ts/.tsx files
       if (!fileName.endsWith('.ts') && !fileName.endsWith('.tsx')) {
-        return originalHost.getSourceFile(
-          fileName,
-          languageVersionOrOptions,
-          onError,
-          shouldCreateNewSourceFile
-        )
+        return getOriginalSourceFile()
       }
 
       // Skip node_modules and declaration files
       if (fileName.includes('node_modules') || fileName.endsWith('.d.ts')) {
-        return originalHost.getSourceFile(
-          fileName,
-          languageVersionOrOptions,
-          onError,
-          shouldCreateNewSourceFile
-        )
+        return getOriginalSourceFile()
       }
 
       // Read the raw source
       const sourceText = originalHost.readFile?.(fileName)
       if (!sourceText) {
-        return originalHost.getSourceFile(
-          fileName,
-          languageVersionOrOptions,
-          onError,
-          shouldCreateNewSourceFile
-        )
+        return getOriginalSourceFile()
       }
 
       // Quick check for gen blocks
       if (!hasGenBlocks(sourceText)) {
-        return originalHost.getSourceFile(
-          fileName,
-          languageVersionOrOptions,
-          onError,
-          shouldCreateNewSourceFile
-        )
+        return getOriginalSourceFile()
       }
 
       // Transform gen {} blocks to Effect.gen()
@@ -101,12 +121,22 @@ const transformer: ProgramTransformer = (
           : languageVersionOrOptions.languageVersion
 
       // Create SourceFile from transformed code
-      return typescript.createSourceFile(
+      const sourceFile = typescript.createSourceFile(
         fileName,
         result.code,
         languageVersion,
         true // setParentNodes
       )
+
+      // CRITICAL: Set version for incremental compilation support.
+      // TypeScript's BuilderProgram requires source files to have version information.
+      // Without this, incremental compilation fails with:
+      // "Debug Failure. Program intended to be used with Builder should have source files with versions set"
+      ;(sourceFile as unknown as { version: string }).version = computeVersion(
+        result.code
+      )
+
+      return sourceFile
     }
   }
 
