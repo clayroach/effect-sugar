@@ -6,7 +6,7 @@
   "scripts": {
     "prepare": "ts-patch install -s",
     "build": "tsc -p tsconfig.tsc.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc -p tsconfig.tsc.json --outDir /tmp/gen-block-typecheck --declaration false"
   },
   "dependencies": {
     "effect": "^3.19.8",
