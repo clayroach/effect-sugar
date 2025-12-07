@@ -69,7 +69,7 @@ importers:
 
   packages/vite-plugin:
     dependencies:
-      '@effect-sugar/core':
+      effect-sugar-core:
         specifier: workspace:*
         version: link:../core
       magic-string:
@@ -122,12 +122,12 @@ importers:
 
   packages/vscode-extension/ts-plugin:
     dependencies:
-      '@effect-sugar/core':
-        specifier: workspace:*
-        version: link:../../core
       '@jridgewell/trace-mapping':
         specifier: ^0.3.20
         version: 0.3.31
+      effect-sugar-core:
+        specifier: workspace:*
+        version: link:../../core
       magic-string:
         specifier: ^0.30.5
         version: 0.30.21

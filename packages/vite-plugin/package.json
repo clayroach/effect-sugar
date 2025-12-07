@@ -67,7 +67,7 @@
     "vitest": "^1.0.0"
   },
   "dependencies": {
-    "@effect-sugar/core": "workspace:*",
+    "effect-sugar-core": "workspace:*",
     "magic-string": "^0.30.5"
   },
   "keywords": [

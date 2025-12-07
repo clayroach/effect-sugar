@@ -28,7 +28,7 @@
  */
 
 import MagicString from "magic-string"
-import { findGenBlocks, type GenBlock, hasGenBlocks, transformBlockContent, extractBindPattern } from "@effect-sugar/core"
+import { findGenBlocks, type GenBlock, hasGenBlocks, transformBlockContent, extractBindPattern } from "effect-sugar-core"
 
 export { findGenBlocks, type GenBlock, hasGenBlocks, transformBlockContent }
 

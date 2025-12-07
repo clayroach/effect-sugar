@@ -27,7 +27,7 @@ import {
   hasGenBlocks as scannerHasGenBlocks,
   findGenBlocks as scannerFindGenBlocks,
   transformBlockContent as scannerTransformBlockContent
-} from '@effect-sugar/core'
+} from 'effect-sugar-core'
 
 export interface GenBlock {
   start: number
