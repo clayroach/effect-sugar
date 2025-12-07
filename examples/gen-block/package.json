@@ -3,9 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "prepare": "ts-patch install -s",
+    "build": "tsc -p tsconfig.tsc.json",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "effect": "^3.19.8",
     "effect-sugar-ts-plugin": "workspace:*",
+    "effect-sugar-tsc": "workspace:*",
+    "ts-patch": "^3.0.0",
     "typescript": "^5.9.3"
   }
 }

@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM"],
+    "outDir": "./dist",
+    "rootDir": ".",
+    "plugins": [
+      {
+        "name": "effect-sugar-tsc",
+        "transform": "effect-sugar-tsc/transform",
+        "transformProgram": true
+      }
+    ]
+  },
+  "include": ["*.ts"],
+  "exclude": ["errors.ts"]
+}

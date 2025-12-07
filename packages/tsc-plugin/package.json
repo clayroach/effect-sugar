@@ -1,0 +1,59 @@
+{
+  "name": "effect-sugar-tsc",
+  "version": "0.1.0",
+  "description": "ts-patch transformer for Effect-TS gen block syntax",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./transform": {
+      "require": "./dist/transform.js",
+      "import": "./dist/transform.js",
+      "types": "./dist/transform.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "ts-patch": ">=3.0.0",
+    "typescript": ">=5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-patch": "^3.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "effect-sugar-core": "workspace:*"
+  },
+  "keywords": [
+    "typescript",
+    "ts-patch",
+    "effect",
+    "effect-ts",
+    "transformer",
+    "gen-blocks"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clayroach/effect-sugar.git",
+    "directory": "packages/tsc-plugin"
+  }
+}
