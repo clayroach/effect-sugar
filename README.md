@@ -77,7 +77,6 @@ Configure the plugin in `tsconfig.json`:
 ```json
 {
   "compilerOptions": {
-    "incremental": false,
     "plugins": [
       {
         "name": "effect-sugar-tsc",
@@ -88,8 +87,6 @@ Configure the plugin in `tsconfig.json`:
   }
 }
 ```
-
-> **Note**: `incremental: false` is required. The `transformProgram` option is incompatible with TypeScript's incremental compilation because the transformed program doesn't preserve source file version information required by the builder.
 
 Run `pnpm install` to trigger the prepare script, then use `tsc` normally.
 
