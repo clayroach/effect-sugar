@@ -21,10 +21,7 @@
     "publish": "turbo run build && changeset publish",
     "publish:dryrun": "turbo run build && pnpm publish:dryrun:vite",
     "publish:dryrun:vite": "pnpm --filter effect-sugar-vite publish --dry-run --no-git-checks",
-    "publish:dev": "pnpm publish:dev:core && pnpm publish:dev:vite && pnpm publish:dev:tsc",
-    "publish:dev:core": "pnpm --filter effect-sugar-core publish:dev",
-    "publish:dev:tsc": "pnpm --filter effect-sugar-tsc publish:dev",
-    "publish:dev:vite": "pnpm --filter effect-sugar-vite publish:dev",
+    "publish:dev": "turbo run build && node scripts/publish-dev.js",
     "package:vscode": "pnpm --filter effect-sugar run package",
     "setup:debug": "pnpm --filter gen-block-examples install && mkdir -p examples/gen-block/node_modules && cp -r packages/vscode-extension/ts-plugin examples/gen-block/node_modules/effect-sugar-ts-plugin"
   },
