@@ -1,5 +1,16 @@
 # @effect-sugar/core
 
+## 0.3.2
+
+### Patch Changes
+
+- ca8dd58: Fix CommonJS require exports in effect-sugar-core package.json.
+
+  TypeScript plugins and other CommonJS consumers need the require entry point
+  in the exports field to properly load the module. This fix adds require entries
+  for both the main and scanner exports, enabling the package to be used by both
+  ES modules and CommonJS consumers.
+
 ## 0.3.1
 
 ### Patch Changes
