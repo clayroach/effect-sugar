@@ -138,6 +138,30 @@ export { program }
 
     expect(result.code).toContain('const { name, age } = yield* getUser(id)')
   })
+
+  it('transforms return bind for divergent effects', () => {
+    const source = `const program = gen {
+  user <- getUser(id)
+  if (!user.name) {
+    return _ <- Effect.fail(new Error("User has no name"))
+  }
+  return user.name
+}`
+    const result = transformSource(source)
+
+    expect(result.hasChanges).toBe(true)
+    expect(result.code).toContain('const user = yield* getUser(id)')
+    expect(result.code).toContain('return yield* Effect.fail(new Error("User has no name"))')
+    expect(result.code).toContain('return user.name')
+  })
+
+  it('transforms return bind with simple pattern', () => {
+    const source = 'const program = gen { return _ <- Effect.die("fatal") }'
+    const result = transformSource(source)
+
+    expect(result.hasChanges).toBe(true)
+    expect(result.code).toBe(`const program = Effect.gen(${MARKER}function* () { return yield* Effect.die("fatal")})`)
+  })
 })
 
 describe('edge cases', () => {

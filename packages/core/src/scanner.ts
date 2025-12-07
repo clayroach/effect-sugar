@@ -184,19 +184,25 @@ function isInsideNestedFunction(tokens: TokenWithPosition[], upToIndex: number):
 /**
  * Extract a binding pattern from the start of a trimmed line.
  * Supports simple identifiers, array destructuring, and object destructuring.
+ * Also supports 'return' prefix for divergent effects.
  *
- * Returns the pattern and expression, or null if not a bind statement.
+ * Returns the pattern, expression, and whether it has a return prefix, or null if not a bind statement.
  */
-export function extractBindPattern(trimmed: string): { pattern: string; expression: string } | null {
+export function extractBindPattern(trimmed: string): { pattern: string; expression: string; hasReturn: boolean } | null {
+  // Check for 'return' prefix
+  const returnMatch = trimmed.match(/^return\s+(.+)$/)
+  const hasReturn = !!returnMatch
+  const withoutReturn = hasReturn ? returnMatch![1]! : trimmed
+
   let pattern: string
   let rest: string
 
-  if (trimmed.startsWith('[')) {
+  if (withoutReturn.startsWith('[')) {
     // Array destructuring - find matching ]
     let depth = 0
     let i = 0
-    for (; i < trimmed.length; i++) {
-      const char = trimmed[i]
+    for (; i < withoutReturn.length; i++) {
+      const char = withoutReturn[i]
       if (char === '[') depth++
       else if (char === ']') {
         depth--
@@ -207,14 +213,14 @@ export function extractBindPattern(trimmed: string): { pattern: string; expressi
       }
     }
     if (depth !== 0) return null
-    pattern = trimmed.slice(0, i)
-    rest = trimmed.slice(i)
-  } else if (trimmed.startsWith('{')) {
+    pattern = withoutReturn.slice(0, i)
+    rest = withoutReturn.slice(i)
+  } else if (withoutReturn.startsWith('{')) {
     // Object destructuring - find matching }
     let depth = 0
     let i = 0
-    for (; i < trimmed.length; i++) {
-      const char = trimmed[i]
+    for (; i < withoutReturn.length; i++) {
+      const char = withoutReturn[i]
       if (char === '{') depth++
       else if (char === '}') {
         depth--
@@ -225,11 +231,11 @@ export function extractBindPattern(trimmed: string): { pattern: string; expressi
       }
     }
     if (depth !== 0) return null
-    pattern = trimmed.slice(0, i)
-    rest = trimmed.slice(i)
+    pattern = withoutReturn.slice(0, i)
+    rest = withoutReturn.slice(i)
   } else {
     // Simple identifier
-    const match = trimmed.match(/^(\w+)(.*)$/)
+    const match = withoutReturn.match(/^(\w+)(.*)$/)
     if (!match) return null
     pattern = match[1]!
     rest = match[2]!
@@ -239,7 +245,7 @@ export function extractBindPattern(trimmed: string): { pattern: string; expressi
   const arrowMatch = rest.match(/^\s*<-\s*(.+)$/)
   if (!arrowMatch) return null
 
-  return { pattern, expression: arrowMatch[1]! }
+  return { pattern, expression: arrowMatch[1]!, hasReturn }
 }
 
 /**
@@ -281,14 +287,22 @@ export function transformBlockContent(content: string): string {
       const bindResult = extractBindPattern(trimmed)
 
       if (bindResult) {
-        const { pattern, expression: exprWithSemi } = bindResult
+        const { pattern, expression: exprWithSemi, hasReturn } = bindResult
         const indent = line.match(/^\s*/)?.[0] || ''
         const hasSemicolon = exprWithSemi.trimEnd().endsWith(';')
         const expression = exprWithSemi.replace(/;?\s*$/, '')
 
-        outputLines.push(
-          `${indent}const ${pattern} = yield* ${expression}${hasSemicolon ? ';' : ''}`
-        )
+        // For return binds (divergent effects), we only output 'return yield* EXPR'
+        // For regular binds, output 'const PATTERN = yield* EXPR'
+        if (hasReturn) {
+          outputLines.push(
+            `${indent}return yield* ${expression}${hasSemicolon ? ';' : ''}`
+          )
+        } else {
+          outputLines.push(
+            `${indent}const ${pattern} = yield* ${expression}${hasSemicolon ? ';' : ''}`
+          )
+        }
         lineStart = lineEnd + 1
         continue
       }

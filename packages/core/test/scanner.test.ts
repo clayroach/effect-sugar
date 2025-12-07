@@ -69,32 +69,47 @@ const b = gen { return 2 }
 describe('extractBindPattern', () => {
   it('extracts simple identifier', () => {
     const result = extractBindPattern('user <- getUser(id)')
-    expect(result).toEqual({ pattern: 'user', expression: 'getUser(id)' })
+    expect(result).toEqual({ pattern: 'user', expression: 'getUser(id)', hasReturn: false })
   })
 
   it('extracts array destructuring', () => {
     const result = extractBindPattern('[a, b] <- Effect.all([getA(), getB()])')
-    expect(result).toEqual({ pattern: '[a, b]', expression: 'Effect.all([getA(), getB()])' })
+    expect(result).toEqual({ pattern: '[a, b]', expression: 'Effect.all([getA(), getB()])', hasReturn: false })
   })
 
   it('extracts object destructuring', () => {
     const result = extractBindPattern('{ name, age } <- getUser(id)')
-    expect(result).toEqual({ pattern: '{ name, age }', expression: 'getUser(id)' })
+    expect(result).toEqual({ pattern: '{ name, age }', expression: 'getUser(id)', hasReturn: false })
   })
 
   it('extracts nested destructuring', () => {
     const result = extractBindPattern('[{ a }, b] <- getComplex()')
-    expect(result).toEqual({ pattern: '[{ a }, b]', expression: 'getComplex()' })
+    expect(result).toEqual({ pattern: '[{ a }, b]', expression: 'getComplex()', hasReturn: false })
   })
 
   it('extracts destructuring with rest spread', () => {
     const result = extractBindPattern('[first, ...rest] <- getItems()')
-    expect(result).toEqual({ pattern: '[first, ...rest]', expression: 'getItems()' })
+    expect(result).toEqual({ pattern: '[first, ...rest]', expression: 'getItems()', hasReturn: false })
   })
 
   it('extracts object destructuring with renaming', () => {
     const result = extractBindPattern('{ name: userName, age: userAge } <- getUser(id)')
-    expect(result).toEqual({ pattern: '{ name: userName, age: userAge }', expression: 'getUser(id)' })
+    expect(result).toEqual({ pattern: '{ name: userName, age: userAge }', expression: 'getUser(id)', hasReturn: false })
+  })
+
+  it('extracts return bind for divergent effects', () => {
+    const result = extractBindPattern('return _ <- Effect.fail(new Error("Not found"))')
+    expect(result).toEqual({ pattern: '_', expression: 'Effect.fail(new Error("Not found"))', hasReturn: true })
+  })
+
+  it('extracts return bind with array destructuring', () => {
+    const result = extractBindPattern('return [a, b] <- Effect.die("fatal")')
+    expect(result).toEqual({ pattern: '[a, b]', expression: 'Effect.die("fatal")', hasReturn: true })
+  })
+
+  it('extracts return bind with object destructuring', () => {
+    const result = extractBindPattern('return { error } <- Effect.fail(error)')
+    expect(result).toEqual({ pattern: '{ error }', expression: 'Effect.fail(error)', hasReturn: true })
   })
 
   it('returns null for non-bind statements', () => {
@@ -233,6 +248,33 @@ describe('transformBlockContent', () => {
 
     expect(output).toContain('const config = yield* loadConfig()')
     expect(output).toContain('const _ = yield* Effect.fail(new Error("Not found"))')
+  })
+
+  it('transforms return bind for divergent effects', () => {
+    const input = '  return _ <- Effect.fail(new Error("Not found"))'
+    const output = transformBlockContent(input)
+
+    expect(output).toBe('  return yield* Effect.fail(new Error("Not found"))')
+  })
+
+  it('transforms return bind with semicolon', () => {
+    const input = '  return _ <- Effect.fail(new Error("Not found"));'
+    const output = transformBlockContent(input)
+
+    expect(output).toBe('  return yield* Effect.fail(new Error("Not found"));')
+  })
+
+  it('handles return bind in control flow', () => {
+    const input = `  config <- loadConfig()
+  if (!config) {
+    return _ <- Effect.fail(new Error("Not found"))
+  }
+  return config`
+    const output = transformBlockContent(input)
+
+    expect(output).toContain('const config = yield* loadConfig()')
+    expect(output).toContain('return yield* Effect.fail(new Error("Not found"))')
+    expect(output).toContain('return config')
   })
 })
 

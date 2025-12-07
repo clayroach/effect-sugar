@@ -60,6 +60,12 @@ interface BindStatement {
   exprEnd: number
   /** Whether there's a trailing semicolon */
   hasSemicolon: boolean
+  /** Whether this is a return bind (divergent effect) */
+  hasReturn: boolean
+  /** Start of 'return' keyword if present */
+  returnStart?: number
+  /** End of 'return' keyword if present */
+  returnEnd?: number
 }
 
 /**
@@ -79,10 +85,29 @@ function findBindStatements(content: string): Array<BindStatement> {
 
     if (bindResult) {
       const indent = line.match(/^\s*/)?.[0] || ""
-      const { pattern: varName, expression: expr } = bindResult
+      const { pattern: varName, expression: expr, hasReturn } = bindResult
 
-      // Calculate positions
-      const varStart = pos + indent.length
+      // Handle return prefix positions
+      let returnStart: number | undefined
+      let returnEnd: number | undefined
+      let varStart: number
+
+      if (hasReturn) {
+        // Line has "return" prefix
+        returnStart = pos + indent.length
+        const returnMatch = trimmed.match(/^return\s+/)
+        if (returnMatch) {
+          returnEnd = returnStart + returnMatch[0].length
+          varStart = returnEnd
+        } else {
+          // Fallback if regex doesn't match (shouldn't happen)
+          varStart = pos + indent.length
+        }
+      } else {
+        // No return prefix
+        varStart = pos + indent.length
+      }
+
       const varEnd = varStart + varName.length
 
       // Find arrow position
@@ -107,7 +132,10 @@ function findBindStatements(content: string): Array<BindStatement> {
         arrowEnd,
         exprStart,
         exprEnd,
-        hasSemicolon
+        hasSemicolon,
+        hasReturn,
+        returnStart,
+        returnEnd
       })
     }
 
@@ -231,16 +259,25 @@ function transformBlock(s: MagicString, source: string, block: GenBlock): void {
     }
 
     // Convert positions to absolute (in source)
-    const absVarStart = contentStart + bind.varStart
-    const absVarEnd = contentStart + bind.varEnd
     const absExprStart = contentStart + bind.exprStart
 
-    // Insert "const " before variable name
-    s.appendLeft(absVarStart, "const ")
+    if (bind.hasReturn && bind.returnStart !== undefined && bind.returnEnd !== undefined) {
+      // Return bind: transform "return PATTERN <- EXPR" to "return yield* EXPR"
+      // Replace everything from "return" to start of expression with "return yield* "
+      const absReturnStart = contentStart + bind.returnStart
+      s.overwrite(absReturnStart, absExprStart, "return yield* ")
+    } else {
+      // Regular bind: transform "PATTERN <- EXPR" to "const PATTERN = yield* EXPR"
+      const absVarStart = contentStart + bind.varStart
+      const absVarEnd = contentStart + bind.varEnd
 
-    // Replace from after variable to start of expression with " = yield* "
-    // This preserves the variable name and expression in their original positions
-    s.overwrite(absVarEnd, absExprStart, " = yield* ")
+      // Insert "const " before variable name
+      s.appendLeft(absVarStart, "const ")
+
+      // Replace from after variable to start of expression with " = yield* "
+      // This preserves the variable name and expression in their original positions
+      s.overwrite(absVarEnd, absExprStart, " = yield* ")
+    }
   }
 
   // 3. Add closing paren after the block's closing brace
