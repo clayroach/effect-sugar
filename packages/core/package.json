@@ -8,10 +8,12 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "require": "./dist/index.js",
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
     "./scanner": {
+      "require": "./dist/scanner.js",
       "import": "./dist/scanner.js",
       "types": "./dist/scanner.d.ts"
     }
