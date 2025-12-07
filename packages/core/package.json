@@ -1,5 +1,5 @@
 {
-  "name": "@effect-sugar/core",
+  "name": "effect-sugar-core",
   "version": "0.3.0",
   "description": "Core scanner and transformer for Effect-TS gen block syntax",
   "type": "module",
