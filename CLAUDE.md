@@ -16,6 +16,9 @@ pnpm run test
 # Run vite-plugin tests only
 pnpm --filter effect-sugar-vite test
 
+# Run tsc-plugin tests only
+pnpm --filter effect-sugar-tsc test
+
 # Run integration tests
 pnpm run test:integration
 
@@ -34,15 +37,24 @@ pnpm changeset
 ```
 effect-sugar/
 ├── packages/
+│   ├── core/               # Core scanner and transformer (effect-sugar-core)
+│   │   ├── src/
+│   │   │   ├── index.ts        # Exports transformSource, hasGenBlocks, etc.
+│   │   │   └── scanner.ts      # Token-based gen {} parser (js-tokens)
+│   │   └── test/
 │   ├── vite-plugin/        # Vite plugin + tsx loader (effect-sugar-vite)
 │   │   ├── src/
 │   │   │   ├── index.ts        # Vite plugin entry point
-│   │   │   ├── transform.ts    # Core transformation logic
-│   │   │   ├── scanner.ts      # Token-based gen {} parser (js-tokens)
+│   │   │   ├── transform.ts    # Transformation with source maps (MagicString)
 │   │   │   ├── eslint.ts       # ESLint preprocessor
 │   │   │   ├── register.ts     # tsx loader registration
 │   │   │   └── loader-hooks.ts # Node.js loader hooks
-│   │   └── test/           # Unit tests
+│   │   └── test/
+│   ├── tsc-plugin/         # ts-patch transformer for tsc (effect-sugar-tsc)
+│   │   ├── src/
+│   │   │   ├── index.ts        # Re-exports
+│   │   │   └── transform.ts    # Program Transformer implementation
+│   │   └── test/
 │   └── vscode-extension/   # VSCode extension (bundles ts-plugin)
 │       ├── src/            # Extension source
 │       └── ts-plugin/      # TypeScript language service plugin
@@ -117,7 +129,46 @@ pnpm add -D effect-sugar-vite esbuild
 
 Note: esbuild is required because the loader bypasses tsx for files with gen blocks.
 
-### Option C: Preprocessor Script (Legacy)
+### Option C: TypeScript Compiler (tsc via ts-patch)
+
+For projects using standard `tsc`:
+
+```bash
+pnpm add -D effect-sugar-tsc ts-patch
+```
+
+```json
+// package.json
+{
+  "scripts": {
+    "prepare": "ts-patch install -s"
+  }
+}
+```
+
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    "incremental": false,
+    "plugins": [
+      {
+        "name": "effect-sugar-tsc",
+        "transform": "effect-sugar-tsc/transform",
+        "transformProgram": true
+      }
+    ]
+  }
+}
+```
+
+**Flow:** `.ts` files → ts-patch intercepts getSourceFile → transforms `gen { }` → TypeScript parses valid code → compiles
+
+**How it works:** Uses a Program Transformer that wraps `CompilerHost.getSourceFile()` to transform source before TypeScript's parser sees it. This is necessary because `gen {}` is not valid TypeScript syntax.
+
+**Important:** `incremental: false` is required. The `transformProgram` option is incompatible with TypeScript's incremental compilation (BuilderProgram) because the transformed program doesn't preserve source file version information. Using `incremental: true` will cause: `"Debug Failure. Program intended to be used with Builder should have source files with versions set"`
+
+### Option D: Preprocessor Script (Legacy)
 
 For projects that can't use Vite or tsx loader:
 
