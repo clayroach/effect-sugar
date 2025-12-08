@@ -39,6 +39,7 @@ jobs:
         run: pnpm run test:integration
 
       - name: Version and Publish
+        id: changesets
         uses: changesets/action@v1
         with:
           version: pnpm exec changeset version
@@ -47,3 +48,37 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Notify Discord on Publish
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "📦 Packages Published",
+                "description": "New packages published to npm!\n\n**Published Packages:**\n```json\n${{ steps.changesets.outputs.publishedPackages }}\n```\n\n**Commit:** [`${{ github.sha }}`](${{ github.event.head_commit.url }})",
+                "color": 3447003,
+                "author": {
+                  "name": "${{ github.actor }}",
+                  "icon_url": "https://github.com/${{ github.actor }}.png"
+                }
+              }]
+            }' \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+
+      - name: Notify Discord on Test Failure
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "❌ Release Failed",
+                "description": "Release workflow failed for commit [`${{ github.sha }}`](${{ github.event.head_commit.url }})\n\n**Branch:** `${{ github.ref_name }}`\n**Failed at:** Tests or Build",
+                "color": 16711680,
+                "author": {
+                  "name": "${{ github.actor }}",
+                  "icon_url": "https://github.com/${{ github.actor }}.png"
+                }
+              }]
+            }' \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"
