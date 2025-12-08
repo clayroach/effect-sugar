@@ -1,5 +1,55 @@
 # @effect-sugar/core
 
+## 0.4.0
+
+### Minor Changes
+
+- 64a8a8d: feat: Add ts-patch transformer for gen {} block compilation
+
+  New package `effect-sugar-tsc` enables compiling gen {} blocks with standard `tsc` via ts-patch.
+
+  **Setup:**
+
+  ```bash
+  pnpm add -D effect-sugar-tsc ts-patch
+  ```
+
+  Add to `package.json`:
+
+  ```json
+  {
+    "scripts": {
+      "prepare": "ts-patch install -s"
+    }
+  }
+  ```
+
+  Add to `tsconfig.json`:
+
+  ```json
+  {
+    "compilerOptions": {
+      "plugins": [
+        {
+          "name": "effect-sugar-tsc",
+          "transform": "effect-sugar-tsc/transform",
+          "transformProgram": true
+        }
+      ]
+    }
+  }
+  ```
+
+  Then use regular `tsc` to compile.
+
+  Also adds `transformSource` function to `effect-sugar-core` for use by the new package.
+
+- 30c270a: tsc bug fixes and hardening
+
+### Patch Changes
+
+- 64a8a8d: effect-sugar-tsc release
+
 ## 0.3.2
 
 ### Patch Changes
@@ -28,7 +78,6 @@
 - 367a826: Publish @effect-sugar/core as public npm package.
 
   Previously @effect-sugar/core was marked as private and only used internally within the workspace. It's now published to npm as a public package so that consumers of effect-sugar-vite and effect-sugar-ts-plugin can properly resolve its dependencies.
-
   - Remove "private" flag from @effect-sugar/core package.json
   - Bump @effect-sugar/core to 0.2.0
   - Update vite-plugin and ts-plugin as dependent patches (no code changes, just version bump for proper npm resolution)
