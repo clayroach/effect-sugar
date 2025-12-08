@@ -1,6 +1,6 @@
 # effect-sugar-esbuild
 
-## 0.0.0-dev-20251208222235
+## 0.1.1
 
 ### Patch Changes
 
