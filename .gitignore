@@ -11,5 +11,8 @@ tmp/
 node_modules/
 package-lock.json
 
+# Local registry configuration
+.npmrc.local
+
 # Turborepo
 .turbo/
