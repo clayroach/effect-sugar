@@ -60,6 +60,12 @@ interface BindStatement {
   exprEnd: number
   /** Whether there's a trailing semicolon */
   hasSemicolon: boolean
+  /** Whether this is a return bind (divergent effect) */
+  hasReturn: boolean
+  /** Start of 'return' keyword if present */
+  returnStart?: number
+  /** End of 'return' keyword if present */
+  returnEnd?: number
 }
 
 /**
@@ -80,10 +86,29 @@ function findBindStatements(content: string): Array<BindStatement> {
 
     if (bindResult) {
       const indent = line.match(/^\s*/)?.[0] || ""
-      const { pattern: varName, expression: expr } = bindResult
+      const { pattern: varName, expression: expr, hasReturn } = bindResult
 
-      // Calculate positions
-      const varStart = pos + indent.length
+      // Handle return prefix positions
+      let returnStart: number | undefined
+      let returnEnd: number | undefined
+      let varStart: number
+
+      if (hasReturn) {
+        // Line has "return" prefix
+        returnStart = pos + indent.length
+        const returnMatch = trimmed.match(/^return\s+/)
+        if (returnMatch) {
+          returnEnd = returnStart + returnMatch[0].length
+          varStart = returnEnd
+        } else {
+          // Fallback if regex doesn't match (shouldn't happen)
+          varStart = pos + indent.length
+        }
+      } else {
+        // No return prefix
+        varStart = pos + indent.length
+      }
+
       const varEnd = varStart + varName.length
 
       // Find arrow position
@@ -101,18 +126,24 @@ function findBindStatements(content: string): Array<BindStatement> {
       const exprEnd = pos + line.trimEnd().length - (hasSemicolon ? 1 : 0)
 
       // CRITICAL: Validate all calculated positions are within bounds
-      console.assert(varStart >= 0 && varStart <= contentLength,
-        `[findBindStatements] varStart ${varStart} out of bounds [0, ${contentLength}]`)
-      console.assert(varEnd >= varStart && varEnd <= contentLength,
-        `[findBindStatements] varEnd ${varEnd} out of bounds [${varStart}, ${contentLength}]`)
-      console.assert(arrowStart >= 0 && arrowStart <= contentLength,
-        `[findBindStatements] arrowStart ${arrowStart} out of bounds [0, ${contentLength}]`)
-      console.assert(arrowEnd >= arrowStart && arrowEnd <= contentLength,
-        `[findBindStatements] arrowEnd ${arrowEnd} out of bounds [${arrowStart}, ${contentLength}]`)
-      console.assert(exprStart >= arrowEnd && exprStart <= contentLength,
-        `[findBindStatements] exprStart ${exprStart} out of bounds [${arrowEnd}, ${contentLength}]`)
-      console.assert(exprEnd >= exprStart && exprEnd <= contentLength,
-        `[findBindStatements] exprEnd ${exprEnd} out of bounds [${exprStart}, ${contentLength}]`)
+      if (!(varStart >= 0 && varStart <= contentLength)) {
+        console.warn(`[findBindStatements] varStart ${varStart} out of bounds [0, ${contentLength}]`)
+      }
+      if (!(varEnd >= varStart && varEnd <= contentLength)) {
+        console.warn(`[findBindStatements] varEnd ${varEnd} out of bounds [${varStart}, ${contentLength}]`)
+      }
+      if (!(arrowStart >= 0 && arrowStart <= contentLength)) {
+        console.warn(`[findBindStatements] arrowStart ${arrowStart} out of bounds [0, ${contentLength}]`)
+      }
+      if (!(arrowEnd >= arrowStart && arrowEnd <= contentLength)) {
+        console.warn(`[findBindStatements] arrowEnd ${arrowEnd} out of bounds [${arrowStart}, ${contentLength}]`)
+      }
+      if (!(exprStart >= arrowEnd && exprStart <= contentLength)) {
+        console.warn(`[findBindStatements] exprStart ${exprStart} out of bounds [${arrowEnd}, ${contentLength}]`)
+      }
+      if (!(exprEnd >= exprStart && exprEnd <= contentLength)) {
+        console.warn(`[findBindStatements] exprEnd ${exprEnd} out of bounds [${exprStart}, ${contentLength}]`)
+      }
 
       statements.push({
         varStart,
@@ -122,7 +153,10 @@ function findBindStatements(content: string): Array<BindStatement> {
         arrowEnd,
         exprStart,
         exprEnd,
-        hasSemicolon
+        hasSemicolon,
+        hasReturn,
+        returnStart,
+        returnEnd
       })
     }
 
@@ -223,12 +257,15 @@ export function transformSource(
  */
 function transformBlock(s: MagicString, source: string, block: GenBlock): void {
   // Validate block boundaries
-  console.assert(block.start >= 0 && block.start < source.length,
-    `[transformBlock] block.start ${block.start} out of bounds [0, ${source.length})`)
-  console.assert(block.braceStart >= block.start && block.braceStart < source.length,
-    `[transformBlock] block.braceStart ${block.braceStart} out of bounds [${block.start}, ${source.length})`)
-  console.assert(block.end > block.braceStart && block.end <= source.length,
-    `[transformBlock] block.end ${block.end} out of bounds (${block.braceStart}, ${source.length}]`)
+  if (!(block.start >= 0 && block.start < source.length)) {
+    console.warn(`[transformBlock] block.start ${block.start} out of bounds [0, ${source.length})`)
+  }
+  if (!(block.braceStart >= block.start && block.braceStart < source.length)) {
+    console.warn(`[transformBlock] block.braceStart ${block.braceStart} out of bounds [${block.start}, ${source.length})`)
+  }
+  if (!(block.end > block.braceStart && block.end <= source.length)) {
+    console.warn(`[transformBlock] block.end ${block.end} out of bounds (${block.braceStart}, ${source.length}]`)
+  }
 
   // 1. Replace "gen " (with trailing space) or "gen{" with the wrapper
   //    "Effect.gen(/* __EFFECT_SUGAR__ */ function* () "
@@ -241,10 +278,12 @@ function transformBlock(s: MagicString, source: string, block: GenBlock): void {
   const contentEnd = block.end - 1
 
   // Validate content boundaries
-  console.assert(contentStart >= 0 && contentStart <= source.length,
-    `[transformBlock] contentStart ${contentStart} out of bounds [0, ${source.length}]`)
-  console.assert(contentEnd >= contentStart && contentEnd <= source.length,
-    `[transformBlock] contentEnd ${contentEnd} out of bounds [${contentStart}, ${source.length}]`)
+  if (!(contentStart >= 0 && contentStart <= source.length)) {
+    console.warn(`[transformBlock] contentStart ${contentStart} out of bounds [0, ${source.length}]`)
+  }
+  if (!(contentEnd >= contentStart && contentEnd <= source.length)) {
+    console.warn(`[transformBlock] contentEnd ${contentEnd} out of bounds [${contentStart}, ${source.length}]`)
+  }
 
   const content = source.slice(contentStart, contentEnd)
 
@@ -261,24 +300,45 @@ function transformBlock(s: MagicString, source: string, block: GenBlock): void {
     }
 
     // Convert positions to absolute (in source)
-    const absVarStart = contentStart + bind.varStart
-    const absVarEnd = contentStart + bind.varEnd
     const absExprStart = contentStart + bind.exprStart
 
-    // Validate absolute positions
-    console.assert(absVarStart >= contentStart && absVarStart < source.length,
-      `[transformBlock] absVarStart ${absVarStart} out of bounds [${contentStart}, ${source.length})`)
-    console.assert(absVarEnd > absVarStart && absVarEnd <= source.length,
-      `[transformBlock] absVarEnd ${absVarEnd} out of bounds (${absVarStart}, ${source.length}]`)
-    console.assert(absExprStart >= absVarEnd && absExprStart < source.length,
-      `[transformBlock] absExprStart ${absExprStart} out of bounds [${absVarEnd}, ${source.length})`)
+    if (bind.hasReturn && bind.returnStart !== undefined && bind.returnEnd !== undefined) {
+      // Return bind: transform "return PATTERN <- EXPR" to "return yield* EXPR"
+      // Replace everything from "return" to start of expression with "return yield* "
+      const absReturnStart = contentStart + bind.returnStart
 
-    // Insert "const " before variable name
-    s.appendLeft(absVarStart, "const ")
+      // Validate absolute positions for return bind
+      if (!(absReturnStart >= contentStart && absReturnStart < source.length)) {
+        console.warn(`[transformBlock] absReturnStart ${absReturnStart} out of bounds [${contentStart}, ${source.length})`)
+      }
+      if (!(absExprStart >= absReturnStart && absExprStart < source.length)) {
+        console.warn(`[transformBlock] absExprStart ${absExprStart} out of bounds [${absReturnStart}, ${source.length})`)
+      }
 
-    // Replace from after variable to start of expression with " = yield* "
-    // This preserves the variable name and expression in their original positions
-    s.overwrite(absVarEnd, absExprStart, " = yield* ")
+      s.overwrite(absReturnStart, absExprStart, "return yield* ")
+    } else {
+      // Regular bind: transform "PATTERN <- EXPR" to "const PATTERN = yield* EXPR"
+      const absVarStart = contentStart + bind.varStart
+      const absVarEnd = contentStart + bind.varEnd
+
+      // Validate absolute positions for regular bind
+      if (!(absVarStart >= contentStart && absVarStart < source.length)) {
+        console.warn(`[transformBlock] absVarStart ${absVarStart} out of bounds [${contentStart}, ${source.length})`)
+      }
+      if (!(absVarEnd > absVarStart && absVarEnd <= source.length)) {
+        console.warn(`[transformBlock] absVarEnd ${absVarEnd} out of bounds (${absVarStart}, ${source.length}]`)
+      }
+      if (!(absExprStart >= absVarEnd && absExprStart < source.length)) {
+        console.warn(`[transformBlock] absExprStart ${absExprStart} out of bounds [${absVarEnd}, ${source.length})`)
+      }
+
+      // Insert "const " before variable name
+      s.appendLeft(absVarStart, "const ")
+
+      // Replace from after variable to start of expression with " = yield* "
+      // This preserves the variable name and expression in their original positions
+      s.overwrite(absVarEnd, absExprStart, " = yield* ")
+    }
   }
 
   // 3. Add closing paren after the block's closing brace

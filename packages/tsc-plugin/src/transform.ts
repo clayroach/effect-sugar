@@ -29,6 +29,38 @@ import type ts from 'typescript'
 import { transformSource, hasGenBlocks } from 'effect-sugar-core'
 
 /**
+ * Detect if we're running in TypeScript Language Service context vs compilation
+ *
+ * When both ts-plugin and tsc-plugin are enabled, we need to detect which context
+ * we're in to avoid conflicts:
+ * - Language Service: Let ts-plugin handle transformation (IDE features)
+ * - Compilation: Use tsc-plugin for actual build
+ */
+function detectLanguageServiceContext(
+  program: ts.Program,
+  host?: ts.CompilerHost
+): boolean {
+  // Method 1: Check for Language Service-specific methods on host
+  // The Language Service host has getScriptSnapshot, regular CompilerHost doesn't
+  if (host && (host as any).getScriptSnapshot) {
+    return true
+  }
+
+  // Method 2: Check for Language Service program flag (internal TypeScript flag)
+  if ((program as any).isLanguageServiceProgram) {
+    return true
+  }
+
+  // Method 3: Check for TSServer environment variable
+  // When VSCode's TypeScript server runs, it sets this
+  if (process.env.TSSERVER_LOG_FILE !== undefined) {
+    return true
+  }
+
+  return false
+}
+
+/**
  * Simple hash function for generating file versions.
  * Used by TypeScript's incremental builder to detect file changes.
  */
@@ -63,6 +95,18 @@ const transformer: ProgramTransformer = (
   _config: PluginConfig,
   { ts: typescript }: ProgramTransformerExtras
 ): ts.Program => {
+  // CRITICAL: Detect if we're in Language Service context
+  // If yes, skip transformation and let ts-plugin handle it
+  // This prevents conflicts when both plugins are enabled
+  const isLanguageService = detectLanguageServiceContext(program, host)
+
+  if (isLanguageService) {
+    console.log('[effect-sugar-tsc] Language Service detected - delegating to ts-plugin')
+    return program
+  }
+
+  console.log('[effect-sugar-tsc] Compilation context detected - transforming gen blocks')
+
   const compilerOptions = program.getCompilerOptions()
   const rootNames = program.getRootFileNames()
 

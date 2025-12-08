@@ -110,108 +110,130 @@ export function createWrappedLanguageServiceHost(
    * Process a file and potentially transform it
    */
   function processFile(fileName: string): TransformState | undefined {
-    // Skip transformation for certain files
-    if (
-      fileName.includes('node_modules') ||
-      fileName.endsWith('.d.ts') ||
-      (!fileName.endsWith('.ts') && !fileName.endsWith('.tsx'))
-    ) {
-      return undefined
-    }
+    try {
+      // Skip transformation for certain files
+      if (
+        fileName.includes('node_modules') ||
+        fileName.endsWith('.d.ts') ||
+        (!fileName.endsWith('.ts') && !fileName.endsWith('.tsx'))
+      ) {
+        return undefined
+      }
 
-    const version = getScriptVersion(fileName)
+      const version = getScriptVersion(fileName)
 
-    // Check if we have a cached state with the same version
-    const cachedState = transformStates.get(fileName)
-    if (cachedState && cachedState.version === version) {
-      return cachedState
-    }
+      // Check if we have a cached state with the same version
+      const cachedState = transformStates.get(fileName)
+      if (cachedState && cachedState.version === version) {
+        return cachedState
+      }
 
-    // Get the original snapshot using the stored reference (avoids infinite recursion)
-    const originalSnapshot = originalGetScriptSnapshot?.(fileName)
-    if (!originalSnapshot) {
-      return undefined
-    }
+      // Get the original snapshot using the stored reference (avoids infinite recursion)
+      const originalSnapshot = originalGetScriptSnapshot?.(fileName)
+      if (!originalSnapshot) {
+        return undefined
+      }
 
-    const originalSource = originalSnapshot.getText(0, originalSnapshot.getLength())
+      const originalSource = originalSnapshot.getText(0, originalSnapshot.getLength())
 
-    // Check if transformation is needed
-    if (!hasGenBlocks(originalSource)) {
-      // Clear any stale cache
+      // Check if transformation is needed
+      if (!hasGenBlocks(originalSource)) {
+        // Clear any stale cache
+        transformStates.delete(fileName)
+        snapshotCache.delete(fileName)
+        clearCachedTransformation(fileName)
+        return undefined
+      }
+
+      // Transform the source
+      const result = transformSource(originalSource, fileName)
+
+      if (!result.hasChanges || !result.map) {
+        transformStates.delete(fileName)
+        snapshotCache.delete(fileName)
+        clearCachedTransformation(fileName)
+        return undefined
+      }
+
+      // Cache the transformation for position mapping using the source map
+      cacheTransformation(fileName, originalSource, result.code, result.map as SourceMapData)
+
+      // Get the mapper
+      const mapper = getPositionMapper(fileName)
+      if (!mapper) {
+        log(`[gen-block] ERROR: Failed to get position mapper for ${fileName}`)
+        return undefined
+      }
+
+      // Create transform state
+      const state: TransformState = {
+        fileName,
+        originalSource,
+        transformedSource: result.code,
+        version,
+        mapper
+      }
+
+      transformStates.set(fileName, state)
+
+      log(`[gen-block] Transformed: ${fileName} (v${version})`)
+
+      return state
+    } catch (error) {
+      log(`[gen-block] ERROR in processFile(${fileName}): ${error instanceof Error ? error.message : String(error)}`)
+      if (error instanceof Error && error.stack) {
+        log(`[gen-block] Stack: ${error.stack}`)
+      }
+      // Clear any partial state on error
       transformStates.delete(fileName)
       snapshotCache.delete(fileName)
       clearCachedTransformation(fileName)
       return undefined
     }
-
-    // Transform the source
-    const result = transformSource(originalSource, fileName)
-
-    if (!result.hasChanges || !result.map) {
-      transformStates.delete(fileName)
-      snapshotCache.delete(fileName)
-      clearCachedTransformation(fileName)
-      return undefined
-    }
-
-    // Cache the transformation for position mapping using the source map
-    cacheTransformation(fileName, originalSource, result.code, result.map as SourceMapData)
-
-    // Get the mapper
-    const mapper = getPositionMapper(fileName)
-    if (!mapper) {
-      return undefined
-    }
-
-    // Create transform state
-    const state: TransformState = {
-      fileName,
-      originalSource,
-      transformedSource: result.code,
-      version,
-      mapper
-    }
-
-    transformStates.set(fileName, state)
-
-    log(`[gen-block] Transformed: ${fileName} (v${version})`)
-
-    return state
   }
 
   /**
    * Get a transformed snapshot for a file
    */
   function getTransformedSnapshot(fileName: string): ts.IScriptSnapshot | undefined {
-    const version = getScriptVersion(fileName)
+    try {
+      const version = getScriptVersion(fileName)
 
-    // Check snapshot cache
-    const cached = snapshotCache.get(fileName)
-    if (cached && cached.version === version) {
-      return cached.transformedSnapshot
-    }
+      // Check snapshot cache
+      const cached = snapshotCache.get(fileName)
+      if (cached && cached.version === version) {
+        return cached.transformedSnapshot
+      }
 
-    // Process the file
-    const state = processFile(fileName)
-    if (!state) {
-      // Not transformed - return original using stored reference
-      snapshotCache.delete(fileName)
+      // Process the file
+      const state = processFile(fileName)
+      if (!state) {
+        // Not transformed - return original using stored reference
+        snapshotCache.delete(fileName)
+        return originalGetScriptSnapshot?.(fileName)
+      }
+
+      // Create transformed snapshot
+      const transformedSnapshot = tsInstance.ScriptSnapshot.fromString(state.transformedSource)
+      const originalSnapshot = originalGetScriptSnapshot?.(fileName)
+
+      if (originalSnapshot) {
+        snapshotCache.set(fileName, {
+          version,
+          originalSnapshot,
+          transformedSnapshot
+        })
+      }
+
+      return transformedSnapshot
+    } catch (error) {
+      log(`[gen-block] ERROR in getTransformedSnapshot(${fileName}): ${error instanceof Error ? error.message : String(error)}`)
+      if (error instanceof Error && error.stack) {
+        log(`[gen-block] Stack: ${error.stack}`)
+      }
+      // On error, return original snapshot to avoid crashing TypeScript
       return originalGetScriptSnapshot?.(fileName)
     }
-
-    // Create transformed snapshot
-    const transformedSnapshot = tsInstance.ScriptSnapshot.fromString(state.transformedSource)
-    const originalSnapshot = originalGetScriptSnapshot?.(fileName)
-
-    if (originalSnapshot) {
-      snapshotCache.set(fileName, {
-        version,
-        originalSnapshot,
-        transformedSnapshot
-      })
-    }
-
-    return transformedSnapshot
   }
 
   // Create wrapped host using Proxy for proper method delegation

@@ -39,3 +39,13 @@ export const sequentialBinds = gen {
   c <- succeed(3)
   return a + b + c
 }
+
+// Return bind for divergent effects (effects that never succeed)
+// The 'return' keyword signals a definitive exit point for type narrowing
+export const withReturnBind = gen {
+  user <- getUser("123")
+  if (!user.name) {
+    return _ <- fail(new Error("User has no name"))
+  }
+  return user.name
+}

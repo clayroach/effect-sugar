@@ -42,22 +42,23 @@ effect-sugar/
 │   │   │   ├── index.ts        # Exports transformSource, hasGenBlocks, etc.
 │   │   │   └── scanner.ts      # Token-based gen {} parser (js-tokens)
 │   │   └── test/
-│   ├── vite-plugin/        # Vite plugin + tsx loader (effect-sugar-vite)
-│   │   ├── src/
-│   │   │   ├── index.ts        # Vite plugin entry point
-│   │   │   ├── transform.ts    # Transformation with source maps (MagicString)
-│   │   │   ├── eslint.ts       # ESLint preprocessor
-│   │   │   ├── register.ts     # tsx loader registration
-│   │   │   └── loader-hooks.ts # Node.js loader hooks
-│   │   └── test/
 │   ├── tsc-plugin/         # ts-patch transformer for tsc (effect-sugar-tsc)
 │   │   ├── src/
 │   │   │   ├── index.ts        # Re-exports
-│   │   │   └── transform.ts    # Program Transformer implementation
+│   │   │   ├── transform.ts    # Program Transformer implementation
+│   │   │   └── eslint.ts       # ESLint preprocessor
 │   │   └── test/
-│   └── vscode-extension/   # VSCode extension (bundles ts-plugin)
-│       ├── src/            # Extension source
-│       └── ts-plugin/      # TypeScript language service plugin
+│   ├── vscode-extension/   # VSCode extension (bundles ts-plugin)
+│   │   ├── src/            # Extension source
+│   │   └── ts-plugin/      # TypeScript language service plugin
+│   └── vite-plugin/        # ⚠️ DEPRECATED - Vite plugin + tsx loader
+│       ├── src/
+│       │   ├── index.ts        # Vite plugin entry point
+│       │   ├── transform.ts    # Transformation with source maps (MagicString)
+│       │   ├── eslint.ts       # ESLint preprocessor (moved to tsc-plugin)
+│       │   ├── register.ts     # tsx loader registration
+│       │   └── loader-hooks.ts # Node.js loader hooks
+│       └── test/
 ├── test/
 │   └── integration/        # Integration tests with Effect-TS
 ├── examples/               # Usage examples
@@ -88,50 +89,9 @@ const program = Effect.gen(function* () {
 
 ## Build Pipeline
 
-There are multiple integration options depending on your project setup:
+### TypeScript Compiler (tsc via ts-patch)
 
-### Option A: Vite Plugin (Frontend)
-
-For Vite-based projects (React, Vue, etc.):
-
-```typescript
-// vite.config.ts
-import effectSugar from 'effect-sugar-vite'
-
-export default defineConfig({
-  plugins: [
-    effectSugar(),  // Add BEFORE other plugins like react()
-    react()
-  ]
-})
-```
-
-**Flow:** `.ts` files → Vite plugin transforms `gen { }` → esbuild compiles → bundled output
-
-### Option B: tsx Loader (Backend/Node.js)
-
-For backend development with tsx:
-
-```bash
-pnpm add -D effect-sugar-vite esbuild
-```
-
-```json
-// package.json
-{
-  "scripts": {
-    "dev": "tsx --import effect-sugar-vite/register --watch src/index.ts"
-  }
-}
-```
-
-**Flow:** `.ts` files → loader reads source → transforms `gen { }` → esbuild compiles → Node.js executes
-
-Note: esbuild is required because the loader bypasses tsx for files with gen blocks.
-
-### Option C: TypeScript Compiler (tsc via ts-patch)
-
-For projects using standard `tsc`:
+**Recommended approach** for all projects:
 
 ```bash
 pnpm add -D effect-sugar-tsc ts-patch
@@ -165,28 +125,31 @@ pnpm add -D effect-sugar-tsc ts-patch
 
 **How it works:** Uses a Program Transformer that wraps `CompilerHost.getSourceFile()` to transform source before TypeScript's parser sees it. This is necessary because `gen {}` is not valid TypeScript syntax.
 
-### Option D: Preprocessor Script (Legacy)
+### ESLint Integration
 
-For projects that can't use Vite or tsx loader:
+Configure ESLint to transform gen blocks before linting:
 
+```javascript
+// eslint.config.mjs
+import effectSugarPreprocessor from 'effect-sugar-tsc/eslint'
+
+export default [
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    processor: effectSugarPreprocessor,
+    // ... your other config
+  }
+]
 ```
-.gen.ts files → preprocess.js → .ts files → TypeScript → .js + .d.ts
-```
-
-1. **Preprocessing**: `scripts/preprocess.js` transforms `gen { }` blocks
-2. **Type Checking**: TypeScript compiles transformed `.ts` files
-3. **Output**: JavaScript with declarations and source maps
 
 ## Key Patterns
 
 ### Statement Types
 - `x <- effect` → `const x = yield* effect` (bind)
+- `_ <- effect` → `yield* effect` (discard pattern - no binding)
 - `let x = expr` → `const x = expr` (let)
 - `return expr` → `return expr` (return)
-- `if/else` → preserved with condition wrapped
-
-### Plugin Pre-Processing
-The plugin uses `transformSource()` which runs before Babel parses. This allows custom `gen { }` syntax without modifying Babel's parser.
+- `return _ <- effect` → `return yield* effect` (early return for type narrowing)
 
 ## Common Pitfalls
 
@@ -203,20 +166,34 @@ import { parseEffBlock } from './parser'
 ### Comments with gen
 The plugin transforms ALL occurrences of `gen {` including in comments. Avoid this pattern in documentation strings.
 
-### File Extensions
-Use `.gen.ts` for files with gen block syntax. The preprocessing step outputs standard `.ts` files.
+### Type Narrowing Requires `return`
+TypeScript's control flow analysis doesn't recognize `yield*` as an exit point. For early returns that need type narrowing, use `return _ <- expr`:
+
+```typescript
+// ✅ Correct - TypeScript narrows types
+if (!info) {
+  return _ <- Effect.fail(new Error("Not found"))
+}
+return info  // TypeScript knows info is not null
+
+// ❌ Wrong - TypeScript doesn't narrow
+if (!info) {
+  _ <- Effect.fail(new Error("Not found"))
+}
+return info  // TypeScript still thinks info could be null
+```
 
 ## Testing
 
-- **Unit tests**: Test scanner and transformation (`packages/vite-plugin/test/`)
+- **Unit tests**: Test scanner and transformation (`packages/core/test/`, `packages/tsc-plugin/test/`)
 - **Integration tests**: Test full pipeline with Effect-TS (`test/integration/`)
 
 ## Current Status
 
 - **Phase 1**: Complete (parser, generator, unit tests)
 - **Phase 2**: Complete (TypeScript integration, VSCode extension)
-- **Phase 3**: Complete (Vite plugin + tsx loader - `effect-sugar-vite`)
-- **Phase 4-5**: Not started (CLI, IntelliJ)
+- **Phase 3**: Complete (ts-patch transformer - `effect-sugar-tsc`)
+- **Vite plugin**: ⚠️ Deprecated - use ts-patch transformer instead
 
 See GitHub Issues for specifications and roadmap.
 
