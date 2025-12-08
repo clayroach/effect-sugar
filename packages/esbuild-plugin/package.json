@@ -1,0 +1,60 @@
+{
+  "name": "effect-sugar-esbuild",
+  "version": "0.1.0",
+  "description": "esbuild plugin for Effect-TS gen block syntax",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./register": {
+      "import": "./dist/register.js",
+      "types": "./dist/register.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "version:dev": "npm version --no-git-tag-version \"$(node -p \"require('./package.json').version.split('-')[0]\")-dev.$(date +%Y%m%d%H%M%S)\"",
+    "publish:dev": "pnpm build && pnpm version:dev && pnpm publish --registry http://localhost:4873 --no-git-checks"
+  },
+  "peerDependencies": {
+    "esbuild": ">=0.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.27.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "effect-sugar-core": "workspace:*"
+  },
+  "keywords": [
+    "esbuild",
+    "esbuild-plugin",
+    "effect",
+    "effect-ts",
+    "transformer",
+    "gen-blocks",
+    "tsx",
+    "bundler"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clayroach/effect-sugar.git",
+    "directory": "packages/esbuild-plugin"
+  }
+}
