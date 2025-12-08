@@ -16,6 +16,11 @@
       "require": "./dist/transform.js",
       "import": "./dist/transform.js",
       "types": "./dist/transform.d.ts"
+    },
+    "./eslint": {
+      "require": "./dist/eslint.js",
+      "import": "./dist/eslint.js",
+      "types": "./dist/eslint.d.ts"
     }
   },
   "files": [
@@ -50,7 +55,9 @@
     "effect",
     "effect-ts",
     "transformer",
-    "gen-blocks"
+    "gen-blocks",
+    "eslint",
+    "preprocessor"
   ],
   "license": "MIT",
   "repository": {

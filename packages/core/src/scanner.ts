@@ -293,10 +293,16 @@ export function transformBlockContent(content: string): string {
         const expression = exprWithSemi.replace(/;?\s*$/, '')
 
         // For return binds (divergent effects), we only output 'return yield* EXPR'
+        // For discard pattern (_), output just 'yield* EXPR' (no binding)
         // For regular binds, output 'const PATTERN = yield* EXPR'
         if (hasReturn) {
           outputLines.push(
             `${indent}return yield* ${expression}${hasSemicolon ? ';' : ''}`
+          )
+        } else if (pattern === '_') {
+          // Discard pattern - no binding needed
+          outputLines.push(
+            `${indent}yield* ${expression}${hasSemicolon ? ';' : ''}`
           )
         } else {
           outputLines.push(

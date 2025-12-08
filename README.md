@@ -22,41 +22,7 @@ const program = gen {
 
 ## Quick Start
 
-### Vite Projects
-
-```bash
-pnpm add -D effect-sugar-vite
-```
-
-```typescript
-// vite.config.ts
-import effectSugar from 'effect-sugar-vite'
-
-export default defineConfig({
-  plugins: [
-    effectSugar(),  // Add BEFORE other plugins
-    react()
-  ]
-})
-```
-
-### Node.js / Backend (tsx)
-
-```bash
-pnpm add -D effect-sugar-vite esbuild
-```
-
-```json
-{
-  "scripts": {
-    "dev": "tsx --import effect-sugar-vite/register --watch src/index.ts"
-  }
-}
-```
-
-### TypeScript Compiler (tsc via ts-patch)
-
-For projects using standard `tsc`, use the ts-patch transformer:
+### Installation
 
 ```bash
 pnpm add -D effect-sugar-tsc ts-patch
@@ -104,24 +70,54 @@ The extension provides syntax highlighting and suppresses TypeScript errors insi
 
 ## Syntax Reference
 
-| Input | Output |
-|-------|--------|
-| `x <- effect` | `const x = yield* effect` |
-| `let x = expr` | `const x = expr` |
-| `return expr` | `return expr` |
+| Input | Output | Notes |
+|-------|--------|-------|
+| `x <- effect` | `const x = yield* effect` | Bind pattern |
+| `_ <- effect` | `yield* effect` | Discard pattern (no binding) |
+| `let x = expr` | `const x = expr` | Let binding |
+| `return expr` | `return expr` | Return value |
+| `return _ <- effect` | `return yield* effect` | Early return (required for type narrowing) |
+
+### Type Narrowing with Early Returns
+
+TypeScript's control flow analysis requires the `return` keyword to understand that a branch exits:
+
+```typescript
+const program = gen {
+  config <- loadConfig()
+  const info = getInfo(config)  // returns ModelInfo | null
+
+  if (!info) {
+    return _ <- Effect.fail(new Error("Not found"))  // ✅ TypeScript narrows
+  }
+
+  return info  // ✅ TypeScript knows info is ModelInfo (not null)
+}
+```
+
+Without `return`, TypeScript cannot narrow the type:
+
+```typescript
+if (!info) {
+  _ <- Effect.fail(new Error("Not found"))  // ❌ TypeScript doesn't narrow
+}
+return info  // ❌ TypeScript still thinks info could be null
+```
 
 ## ESLint Integration
 
-```typescript
-// eslint.config.js
-import effectSugarPreprocessor from 'effect-sugar-vite/eslint'
+The ESLint preprocessor transforms gen blocks before linting, preventing syntax errors:
+
+```javascript
+// eslint.config.mjs
+import effectSugarPreprocessor from 'effect-sugar-tsc/eslint'
 
 export default [
   {
     files: ['**/*.ts', '**/*.tsx'],
-    processor: effectSugarPreprocessor
-  },
-  // ... other configs
+    processor: effectSugarPreprocessor,
+    // ... your other config (parser, plugins, rules)
+  }
 ]
 ```
 
@@ -137,9 +133,9 @@ pnpm test:integration
 ## Project Structure
 
 - `packages/core/` - Core scanner and transformer (`effect-sugar-core`)
-- `packages/vite-plugin/` - Vite plugin + tsx loader (`effect-sugar-vite`)
 - `packages/tsc-plugin/` - ts-patch transformer for tsc (`effect-sugar-tsc`)
 - `packages/vscode-extension/` - VSCode extension with bundled TS plugin
+- `packages/vite-plugin/` - ⚠️ Deprecated - Vite plugin + tsx loader (`effect-sugar-vite`)
 
 ## License
 

@@ -97,6 +97,11 @@ describe('extractBindPattern', () => {
     expect(result).toEqual({ pattern: '{ name: userName, age: userAge }', expression: 'getUser(id)', hasReturn: false })
   })
 
+  it('extracts discard pattern for effects without binding', () => {
+    const result = extractBindPattern('_ <- Effect.log("message")')
+    expect(result).toEqual({ pattern: '_', expression: 'Effect.log("message")', hasReturn: false })
+  })
+
   it('extracts return bind for divergent effects', () => {
     const result = extractBindPattern('return _ <- Effect.fail(new Error("Not found"))')
     expect(result).toEqual({ pattern: '_', expression: 'Effect.fail(new Error("Not found"))', hasReturn: true })
@@ -247,7 +252,8 @@ describe('transformBlockContent', () => {
     const output = transformBlockContent(input)
 
     expect(output).toContain('const config = yield* loadConfig()')
-    expect(output).toContain('const _ = yield* Effect.fail(new Error("Not found"))')
+    expect(output).toContain('yield* Effect.fail(new Error("Not found"))')
+    expect(output).not.toContain('const _ = yield*')
   })
 
   it('transforms return bind for divergent effects', () => {

@@ -162,6 +162,40 @@ export { program }
     expect(result.hasChanges).toBe(true)
     expect(result.code).toBe(`const program = Effect.gen(${MARKER}function* () { return yield* Effect.die("fatal")})`)
   })
+
+  it('transforms discard pattern (_ <-) without creating a binding', () => {
+    const source = `const program = gen {
+  config <- loadConfig()
+  const info = getInfo(config)
+  if (!info) {
+    _ <- Effect.fail(new Error("Not found"))
+  }
+  return info
+}`
+    const result = transformSource(source)
+
+    expect(result.hasChanges).toBe(true)
+    expect(result.code).toContain('const config = yield* loadConfig()')
+    expect(result.code).toContain('yield* Effect.fail(new Error("Not found"))')
+    expect(result.code).not.toContain('const _ = yield*')
+    expect(result.code).toContain('return info')
+  })
+
+  it('transforms multiple discard patterns correctly', () => {
+    const source = `const program = gen {
+  _ <- logStart()
+  result <- compute()
+  _ <- logEnd()
+  return result
+}`
+    const result = transformSource(source)
+
+    expect(result.hasChanges).toBe(true)
+    expect(result.code).toContain('yield* logStart()')
+    expect(result.code).toContain('const result = yield* compute()')
+    expect(result.code).toContain('yield* logEnd()')
+    expect(result.code).not.toContain('const _ = yield*')
+  })
 })
 
 describe('edge cases', () => {
@@ -238,7 +272,8 @@ describe('edge cases', () => {
     const result = transformSource(source)
 
     expect(result.code).toContain('const config = yield* loadConfig()')
-    expect(result.code).toContain('const _ = yield* Effect.fail(new Error("Not found"))')
+    expect(result.code).toContain('yield* Effect.fail(new Error("Not found"))')
+    expect(result.code).not.toContain('const _ = yield*')
   })
 
   it('does NOT transform binds inside nested arrow functions', () => {
