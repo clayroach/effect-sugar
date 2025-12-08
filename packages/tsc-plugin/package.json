@@ -1,7 +1,7 @@
 {
-  "name": "effect-sugar-core",
-  "version": "0.3.2",
-  "description": "Core scanner and transformer for Effect-TS gen block syntax",
+  "name": "effect-sugar-tsc",
+  "version": "0.1.0",
+  "description": "ts-patch transformer for Effect-TS gen block syntax",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -12,10 +12,10 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./scanner": {
-      "require": "./dist/scanner.js",
-      "import": "./dist/scanner.js",
-      "types": "./dist/scanner.d.ts"
+    "./transform": {
+      "require": "./dist/transform.js",
+      "import": "./dist/transform.js",
+      "types": "./dist/transform.d.ts"
     }
   },
   "files": [
@@ -31,18 +31,31 @@
     "version:dev": "npm version --no-git-tag-version \"$(node -p \"require('./package.json').version.split('-')[0]\")-dev.$(date +%Y%m%d%H%M%S)\"",
     "publish:dev": "pnpm build && pnpm version:dev && pnpm publish --registry http://localhost:4873 --no-git-checks"
   },
+  "peerDependencies": {
+    "ts-patch": ">=3.0.0",
+    "typescript": ">=5.0.0"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "ts-patch": "^3.0.0",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"
   },
   "dependencies": {
-    "js-tokens": "^9.0.1"
+    "effect-sugar-core": "workspace:*"
   },
+  "keywords": [
+    "typescript",
+    "ts-patch",
+    "effect",
+    "effect-ts",
+    "transformer",
+    "gen-blocks"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/clayroach/effect-sugar.git",
-    "directory": "packages/core"
+    "directory": "packages/tsc-plugin"
   }
 }

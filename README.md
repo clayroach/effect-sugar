@@ -54,6 +54,42 @@ pnpm add -D effect-sugar-vite esbuild
 }
 ```
 
+### TypeScript Compiler (tsc via ts-patch)
+
+For projects using standard `tsc`, use the ts-patch transformer:
+
+```bash
+pnpm add -D effect-sugar-tsc ts-patch
+```
+
+Add a prepare script to auto-patch TypeScript after installs:
+
+```json
+{
+  "scripts": {
+    "prepare": "ts-patch install -s"
+  }
+}
+```
+
+Configure the plugin in `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "effect-sugar-tsc",
+        "transform": "effect-sugar-tsc/transform",
+        "transformProgram": true
+      }
+    ]
+  }
+}
+```
+
+Run `pnpm install` to trigger the prepare script, then use `tsc` normally.
+
 ### IDE Support (VSCode)
 
 Install the VSCode extension from the [releases page](https://github.com/clayroach/effect-sugar/releases) or build locally:
@@ -100,7 +136,9 @@ pnpm test:integration
 
 ## Project Structure
 
+- `packages/core/` - Core scanner and transformer (`effect-sugar-core`)
 - `packages/vite-plugin/` - Vite plugin + tsx loader (`effect-sugar-vite`)
+- `packages/tsc-plugin/` - ts-patch transformer for tsc (`effect-sugar-tsc`)
 - `packages/vscode-extension/` - VSCode extension with bundled TS plugin
 
 ## License

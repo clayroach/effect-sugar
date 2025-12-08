@@ -7,12 +7,19 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "lib": ["ES2022", "DOM"],
-    "types": ["node"],
+    "outDir": "./dist",
+    "rootDir": ".",
     "plugins": [
       {
         "name": "effect-sugar-ts-plugin"
+      },
+      {
+        "name": "effect-sugar-tsc",
+        "transform": "effect-sugar-tsc/transform",
+        "transformProgram": true
       }
     ]
   },
-  "include": ["*.ts"]
+  "include": ["*.ts"],
+  "exclude": ["errors.ts"]
 }
