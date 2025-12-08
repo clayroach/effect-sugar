@@ -64,7 +64,18 @@ export class PositionMapper {
    * Convert an absolute position to line/column (1-based line, 0-based column)
    */
   private positionToLineColumn(source: string, pos: number): { line: number; column: number } {
-    const lines = source.slice(0, pos).split("\n")
+    // Validate and clamp position
+    console.assert(pos >= 0,
+      `[positionToLineColumn] Position ${pos} is negative`)
+
+    // Clamp to valid range
+    const clampedPos = Math.max(0, Math.min(pos, source.length))
+
+    if (clampedPos !== pos) {
+      console.warn(`[positionToLineColumn] Position ${pos} clamped to ${clampedPos} (source length: ${source.length})`)
+    }
+
+    const lines = source.slice(0, clampedPos).split("\n")
     const lastLine = lines[lines.length - 1]
     return {
       line: lines.length,
@@ -76,13 +87,28 @@ export class PositionMapper {
    * Convert line/column to absolute position
    */
   private lineColumnToPosition(source: string, line: number, column: number): number {
+    // Validate inputs
+    console.assert(line >= 1,
+      `[lineColumnToPosition] Line ${line} is invalid (should be >= 1)`)
+    console.assert(column >= 0,
+      `[lineColumnToPosition] Column ${column} is negative`)
+
     const lines = source.split("\n")
     let pos = 0
     for (let i = 0; i < line - 1 && i < lines.length; i++) {
       const currentLine = lines[i]
       pos += (currentLine ? currentLine.length : 0) + 1 // +1 for newline
     }
-    return pos + column
+
+    const result = pos + column
+
+    // Validate result is within bounds
+    if (result > source.length) {
+      console.warn(`[lineColumnToPosition] Calculated position ${result} exceeds source length ${source.length} (line: ${line}, column: ${column})`)
+    }
+
+    // Clamp to valid range
+    return Math.max(0, Math.min(result, source.length))
   }
 
   /**
