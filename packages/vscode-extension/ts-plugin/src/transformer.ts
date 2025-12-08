@@ -76,6 +76,7 @@ function findBindStatements(content: string): Array<BindStatement> {
   const statements: Array<BindStatement> = []
   const lines = content.split("\n")
   let pos = 0
+  const contentLength = content.length
 
   for (const line of lines) {
     const trimmed = line.trim()
@@ -123,6 +124,20 @@ function findBindStatements(content: string): Array<BindStatement> {
       // Expression end (handle semicolon)
       const hasSemicolon = expr.trimEnd().endsWith(";")
       const exprEnd = pos + line.trimEnd().length - (hasSemicolon ? 1 : 0)
+
+      // CRITICAL: Validate all calculated positions are within bounds
+      console.assert(varStart >= 0 && varStart <= contentLength,
+        `[findBindStatements] varStart ${varStart} out of bounds [0, ${contentLength}]`)
+      console.assert(varEnd >= varStart && varEnd <= contentLength,
+        `[findBindStatements] varEnd ${varEnd} out of bounds [${varStart}, ${contentLength}]`)
+      console.assert(arrowStart >= 0 && arrowStart <= contentLength,
+        `[findBindStatements] arrowStart ${arrowStart} out of bounds [0, ${contentLength}]`)
+      console.assert(arrowEnd >= arrowStart && arrowEnd <= contentLength,
+        `[findBindStatements] arrowEnd ${arrowEnd} out of bounds [${arrowStart}, ${contentLength}]`)
+      console.assert(exprStart >= arrowEnd && exprStart <= contentLength,
+        `[findBindStatements] exprStart ${exprStart} out of bounds [${arrowEnd}, ${contentLength}]`)
+      console.assert(exprEnd >= exprStart && exprEnd <= contentLength,
+        `[findBindStatements] exprEnd ${exprEnd} out of bounds [${exprStart}, ${contentLength}]`)
 
       statements.push({
         varStart,
@@ -235,6 +250,14 @@ export function transformSource(
  * Transform a single gen block using fine-grained operations
  */
 function transformBlock(s: MagicString, source: string, block: GenBlock): void {
+  // Validate block boundaries
+  console.assert(block.start >= 0 && block.start < source.length,
+    `[transformBlock] block.start ${block.start} out of bounds [0, ${source.length})`)
+  console.assert(block.braceStart >= block.start && block.braceStart < source.length,
+    `[transformBlock] block.braceStart ${block.braceStart} out of bounds [${block.start}, ${source.length})`)
+  console.assert(block.end > block.braceStart && block.end <= source.length,
+    `[transformBlock] block.end ${block.end} out of bounds (${block.braceStart}, ${source.length}]`)
+
   // 1. Replace "gen " (with trailing space) or "gen{" with the wrapper
   //    "Effect.gen(/* __EFFECT_SUGAR__ */ function* () "
   //    The opening brace { stays in place
@@ -244,6 +267,13 @@ function transformBlock(s: MagicString, source: string, block: GenBlock): void {
   //    Only modify the parts that change, keeping expressions in place
   const contentStart = block.braceStart + 1
   const contentEnd = block.end - 1
+
+  // Validate content boundaries
+  console.assert(contentStart >= 0 && contentStart <= source.length,
+    `[transformBlock] contentStart ${contentStart} out of bounds [0, ${source.length}]`)
+  console.assert(contentEnd >= contentStart && contentEnd <= source.length,
+    `[transformBlock] contentEnd ${contentEnd} out of bounds [${contentStart}, ${source.length}]`)
+
   const content = source.slice(contentStart, contentEnd)
 
   const bindStatements = findBindStatements(content)
@@ -265,11 +295,26 @@ function transformBlock(s: MagicString, source: string, block: GenBlock): void {
       // Return bind: transform "return PATTERN <- EXPR" to "return yield* EXPR"
       // Replace everything from "return" to start of expression with "return yield* "
       const absReturnStart = contentStart + bind.returnStart
+
+      // Validate absolute positions for return bind
+      console.assert(absReturnStart >= contentStart && absReturnStart < source.length,
+        `[transformBlock] absReturnStart ${absReturnStart} out of bounds [${contentStart}, ${source.length})`)
+      console.assert(absExprStart >= absReturnStart && absExprStart < source.length,
+        `[transformBlock] absExprStart ${absExprStart} out of bounds [${absReturnStart}, ${source.length})`)
+
       s.overwrite(absReturnStart, absExprStart, "return yield* ")
     } else {
       // Regular bind: transform "PATTERN <- EXPR" to "const PATTERN = yield* EXPR"
       const absVarStart = contentStart + bind.varStart
       const absVarEnd = contentStart + bind.varEnd
+
+      // Validate absolute positions for regular bind
+      console.assert(absVarStart >= contentStart && absVarStart < source.length,
+        `[transformBlock] absVarStart ${absVarStart} out of bounds [${contentStart}, ${source.length})`)
+      console.assert(absVarEnd > absVarStart && absVarEnd <= source.length,
+        `[transformBlock] absVarEnd ${absVarEnd} out of bounds (${absVarStart}, ${source.length}]`)
+      console.assert(absExprStart >= absVarEnd && absExprStart < source.length,
+        `[transformBlock] absExprStart ${absExprStart} out of bounds [${absVarEnd}, ${source.length})`)
 
       // Insert "const " before variable name
       s.appendLeft(absVarStart, "const ")
