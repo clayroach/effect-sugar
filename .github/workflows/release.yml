@@ -32,12 +32,18 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Create Release PR or Publish
+      - name: Test
+        run: pnpm run test
+
+      - name: Integration Tests
+        run: pnpm run test:integration
+
+      - name: Version and Publish
         uses: changesets/action@v1
         with:
+          version: pnpm exec changeset version
           publish: pnpm run publish
-          title: 'chore: version packages'
           commit: 'chore: version packages'
         env:
-          GITHUB_TOKEN: ${{ secrets.CHANGESET_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
