@@ -1,5 +1,14 @@
 # effect-sugar-vite
 
+## 0.3.4
+
+### Patch Changes
+
+- Updated dependencies [64a8a8d]
+- Updated dependencies [64a8a8d]
+- Updated dependencies [30c270a]
+  - effect-sugar-core@0.4.0
+
 ## 0.3.3
 
 ### Patch Changes

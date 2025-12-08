@@ -1,5 +1,18 @@
 # effect-sugar-ts-plugin
 
+## 0.3.0
+
+### Minor Changes
+
+- 30c270a: tsc bug fixes and hardening
+
+### Patch Changes
+
+- Updated dependencies [64a8a8d]
+- Updated dependencies [64a8a8d]
+- Updated dependencies [30c270a]
+  - effect-sugar-core@0.4.0
+
 ## 0.2.6
 
 ### Patch Changes
