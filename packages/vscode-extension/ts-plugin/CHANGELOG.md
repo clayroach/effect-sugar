@@ -1,5 +1,13 @@
 # effect-sugar-ts-plugin
 
+## 0.2.7
+
+### Patch Changes
+
+- Updated dependencies [64a8a8d]
+- Updated dependencies [64a8a8d]
+  - effect-sugar-core@0.4.0
+
 ## 0.2.6
 
 ### Patch Changes
