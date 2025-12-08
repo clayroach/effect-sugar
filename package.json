@@ -14,6 +14,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "clean": "turbo run clean && rm -rf node_modules target",
+    "clean:cache": "turbo run clean --force && rm -rf node_modules .turbo target",
     "preprocess": "node scripts/preprocess.js examples",
     "format": "node scripts/format-gen.js examples",
     "changeset": "changeset",
