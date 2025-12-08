@@ -87,36 +87,17 @@ jobs:
     if: always()
 
     steps:
-      - name: Notify Discord on Success
-        if: needs.build.result == 'success' && needs.test.result == 'success' && needs.test-integration.result == 'success'
-        run: |
-          curl -H "Content-Type: application/json" \
-            -d '{
-              "embeds": [{
-                "title": "✅ CI Passed",
-                "description": "All tests passed for commit [`${{ github.sha }}`](${{ github.event.head_commit.url }})\n\n**Branch:** `${{ github.ref_name }}`\n**Trigger:** ${{ github.event_name }}",
-                "color": 65280,
-                "author": {
-                  "name": "${{ github.actor }}",
-                  "icon_url": "https://github.com/${{ github.actor }}.png"
-                }
-              }]
-            }' \
-            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+      - uses: actions/checkout@v4
 
-      - name: Notify Discord on Failure
-        if: needs.build.result == 'failure' || needs.test.result == 'failure' || needs.test-integration.result == 'failure'
-        run: |
-          curl -H "Content-Type: application/json" \
-            -d '{
-              "embeds": [{
-                "title": "❌ CI Failed",
-                "description": "Tests failed for commit [`${{ github.sha }}`](${{ github.event.head_commit.url }})\n\n**Branch:** `${{ github.ref_name }}`\n**Trigger:** ${{ github.event_name }}\n**Build:** ${{ needs.build.result }}\n**Test:** ${{ needs.test.result }}\n**Integration:** ${{ needs.test-integration.result }}",
-                "color": 16711680,
-                "author": {
-                  "name": "${{ github.actor }}",
-                  "icon_url": "https://github.com/${{ github.actor }}.png"
-                }
-              }]
-            }' \
-            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+      - name: Notify Discord
+        uses: atrim-ai/github-actions/discord-notify@main
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: ${{ (needs.build.result == 'success' && needs.test.result == 'success' && needs.test-integration.result == 'success') && 'success' || 'failure' }}
+          job-name: 'CI Pipeline'
+          workflow-name: 'Continuous Integration'
+          error-details: |
+            **Job Results:**
+            • Build: ${{ needs.build.result }}
+            • Unit Tests: ${{ needs.test.result }}
+            • Integration Tests: ${{ needs.test-integration.result }}

@@ -49,36 +49,30 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Checkout for notifications
+        if: always()
+        uses: actions/checkout@v4
+
       - name: Notify Discord on Publish
         if: steps.changesets.outputs.published == 'true'
-        run: |
-          curl -H "Content-Type: application/json" \
-            -d '{
-              "embeds": [{
-                "title": "📦 Packages Published",
-                "description": "New packages published to npm!\n\n**Published Packages:**\n```json\n${{ steps.changesets.outputs.publishedPackages }}\n```\n\n**Commit:** [`${{ github.sha }}`](${{ github.event.head_commit.url }})",
-                "color": 3447003,
-                "author": {
-                  "name": "${{ github.actor }}",
-                  "icon_url": "https://github.com/${{ github.actor }}.png"
-                }
-              }]
-            }' \
-            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+        uses: atrim-ai/github-actions/discord-notify@main
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: 'success'
+          job-name: '📦 Packages Published'
+          workflow-name: 'Release'
+          error-details: |
+            **Published Packages:**
+            ```json
+            ${{ steps.changesets.outputs.publishedPackages }}
+            ```
 
-      - name: Notify Discord on Test Failure
+      - name: Notify Discord on Failure
         if: failure()
-        run: |
-          curl -H "Content-Type: application/json" \
-            -d '{
-              "embeds": [{
-                "title": "❌ Release Failed",
-                "description": "Release workflow failed for commit [`${{ github.sha }}`](${{ github.event.head_commit.url }})\n\n**Branch:** `${{ github.ref_name }}`\n**Failed at:** Tests or Build",
-                "color": 16711680,
-                "author": {
-                  "name": "${{ github.actor }}",
-                  "icon_url": "https://github.com/${{ github.actor }}.png"
-                }
-              }]
-            }' \
-            "${{ secrets.DISCORD_WEBHOOK_URL }}"
+        uses: atrim-ai/github-actions/discord-notify@main
+        with:
+          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          status: 'failure'
+          job-name: 'Release Pipeline'
+          workflow-name: 'Release'
+          error-details: 'Release workflow failed during tests, build, or publish step.'
