@@ -41,25 +41,19 @@ const buildReport = (customerId: string) =>
   })
 ```
 
-## Quick Start
+## Quick Start (Recommended Setup)
 
-### Installation
+This is the recommended setup for most projects. It uses standard TypeScript compilation with IDE support.
+
+### 1. Install Dependencies
 
 ```bash
 pnpm add -D effect-sugar-tsc ts-patch
 ```
 
-Add a prepare script to auto-patch TypeScript after installs:
+### 2. Configure TypeScript
 
-```json
-{
-  "scripts": {
-    "prepare": "ts-patch install -s"
-  }
-}
-```
-
-Configure the plugin in `tsconfig.json`:
+Add the transformer plugin to `tsconfig.json`:
 
 ```json
 {
@@ -75,15 +69,39 @@ Configure the plugin in `tsconfig.json`:
 }
 ```
 
-Run `pnpm install` to trigger the prepare script, then use `tsc` normally.
+### 3. Auto-Patch TypeScript
 
-### IDE Support
+Add a prepare script to `package.json`:
 
-#### Option 1: TypeScript Plugin Only (Any Editor)
+```json
+{
+  "scripts": {
+    "prepare": "ts-patch install -s"
+  }
+}
+```
 
-The TypeScript language service plugin provides IntelliSense features (hover, go-to-definition, auto-complete) for gen blocks in **any editor** that uses the TypeScript language server (VSCode, WebStorm, Vim, etc.).
+### 4. Install
 
-Add the language service plugin to your `tsconfig.json` alongside the tsc transformer:
+Run `pnpm install` to trigger the prepare script. You can now use `tsc` normally and gen blocks will be transformed during compilation.
+
+## IDE Support (VSCode Recommended)
+
+### VSCode Extension (Recommended)
+
+For the best developer experience, install the VSCode extension:
+
+1. Download from the [releases page](https://github.com/clayroach/effect-sugar/releases)
+2. Install: `code --install-extension effect-sugar-x.x.x.vsix`
+
+The extension provides:
+- ✅ Syntax highlighting for gen blocks
+- ✅ IntelliSense (hover, go-to-definition, autocomplete)
+- ✅ Suppresses TypeScript errors inside gen blocks
+
+### Other Editors (TypeScript Plugin)
+
+For editors other than VSCode (WebStorm, Vim, etc.), add the TypeScript language service plugin:
 
 ```json
 {
@@ -100,21 +118,38 @@ Add the language service plugin to your `tsconfig.json` alongside the tsc transf
 }
 ```
 
-Then restart your editor's TypeScript server (in VSCode: Cmd+Shift+P → "TypeScript: Restart TS Server").
+Then restart your editor's TypeScript server.
 
-#### Option 2: VSCode Extension (Full Experience)
+## ESLint Integration
 
-For VSCode users, the extension adds syntax highlighting and suppresses TypeScript errors inside gen blocks.
+Transform gen blocks before linting to prevent syntax errors:
 
-Install from the [releases page](https://github.com/clayroach/effect-sugar/releases) or build locally:
+```javascript
+// eslint.config.mjs
+import effectSugarPreprocessor from 'effect-sugar-tsc/eslint'
 
-```bash
-cd packages/vscode-extension
-pnpm build && pnpm package
-code --install-extension ../../target/effect-sugar-0.1.0.vsix
+export default [
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    processor: effectSugarPreprocessor,
+    // ... your other config
+  }
+]
 ```
 
-The VSCode extension bundles the TypeScript language service plugin, so you don't need to add the second plugin entry to `tsconfig.json`.
+## Prettier Integration
+
+Prettier support is planned. For now, gen blocks work with standard Prettier TypeScript formatting.
+
+## Alternative Setups
+
+The recommended setup above works for most projects. For specific build tools or use cases:
+
+- **[esbuild bundling](./docs/setup/esbuild.md)** - For production builds with esbuild, tsup, or unbuild
+- **[tsx runtime with hot reload](./docs/setup/tsx-runtime.md)** - For Docker development environments
+- **[Vite](./docs/setup/vite.md)** - ⚠️ Deprecated, for existing projects only
+
+See the [setup guides](./docs/setup/) for more options.
 
 ## Syntax Reference
 
@@ -126,67 +161,11 @@ The VSCode extension bundles the TypeScript language service plugin, so you don'
 | `return expr` | `return expr` | Return value |
 | `return _ <- effect` | `return yield* effect` | Early return (required for type narrowing) |
 
-## ESLint Integration
-
-The ESLint preprocessor transforms gen blocks before linting, preventing syntax errors:
-
-```javascript
-// eslint.config.mjs
-import effectSugarPreprocessor from 'effect-sugar-tsc/eslint'
-
-export default [
-  {
-    files: ['**/*.ts', '**/*.tsx'],
-    processor: effectSugarPreprocessor,
-    // ... your other config (parser, plugins, rules)
-  }
-]
-```
-
-## Advanced Examples
-
-### Racing Multiple Data Sources
+## Example: Racing Multiple Data Sources
 
 Fetch data from multiple sources simultaneously and use the first to respond:
 
 ```typescript
-// Instead of this:
-import { Effect } from "effect"
-
-const fetchProduct = (productId: string) =>
-  Effect.gen(function* () {
-    const metadata = yield* getProductMetadata(productId)
-
-    if (!metadata.isAvailable) {
-      return yield* Effect.fail(new UnavailableError())
-    }
-
-    const data = yield* Effect.raceAll([
-      Effect.gen(function* () {
-        const cached = yield* fetchFromCache(productId)
-        yield* validateCache(cached)
-        const enriched = yield* enrichProductData(cached)
-        return { source: 'cache', data: enriched }
-      }),
-      Effect.gen(function* () {
-        const primary = yield* fetchFromPrimaryDB(productId)
-        const { details, inventory } = yield* getProductDetails(primary.id)
-        return { source: 'primary', data: { ...primary, details, inventory } }
-      }),
-      Effect.gen(function* () {
-        const replica = yield* fetchFromReplica(productId)
-        yield* logReplicaUsage(productId)
-        return { source: 'replica', data: replica }
-      })
-    ])
-
-    yield* updateMetrics(data.source)
-    const formatted = yield* formatProduct(data.data)
-
-    return { product: formatted, source: data.source, metadata }
-  })
-
-// Write this:
 import { Effect, fail, raceAll } from "effect"
 
 const fetchProduct = (productId: string) => gen {
@@ -222,44 +201,52 @@ const fetchProduct = (productId: string) => gen {
 }
 ```
 
-### Parallel Operations with Effect.all
-
-Execute multiple independent operations concurrently:
+<details>
+<summary>View the equivalent Effect.gen code</summary>
 
 ```typescript
-// Instead of this:
 import { Effect } from "effect"
 
-const fetchDashboard = (userId: string) =>
+const fetchProduct = (productId: string) =>
   Effect.gen(function* () {
-    const user = yield* getUser(userId)
+    const metadata = yield* getProductMetadata(productId)
 
-    if (!user.isActive) {
-      return yield* Effect.fail(new InactiveUserError())
+    if (!metadata.isAvailable) {
+      return yield* Effect.fail(new UnavailableError())
     }
 
-    const [profile, stats, notifications] = yield* Effect.all([
+    const data = yield* Effect.raceAll([
       Effect.gen(function* () {
-        const p = yield* fetchProfile(user.id)
-        const enriched = yield* enrichProfile(p)
-        return enriched
+        const cached = yield* fetchFromCache(productId)
+        yield* validateCache(cached)
+        const enriched = yield* enrichProductData(cached)
+        return { source: 'cache', data: enriched }
       }),
       Effect.gen(function* () {
-        const s = yield* fetchStats(user.id)
-        yield* cacheStats(s)
-        return s
+        const primary = yield* fetchFromPrimaryDB(productId)
+        const { details, inventory } = yield* getProductDetails(primary.id)
+        return { source: 'primary', data: { ...primary, details, inventory } }
       }),
       Effect.gen(function* () {
-        const events = yield* fetchNotifications(user.id)
-        const unread = events.filter(x => !x.read)
-        return unread
+        const replica = yield* fetchFromReplica(productId)
+        yield* logReplicaUsage(productId)
+        return { source: 'replica', data: replica }
       })
     ])
 
-    return { user, profile, stats, notifications }
-  })
+    yield* updateMetrics(data.source)
+    const formatted = yield* formatProduct(data.data)
 
-// Write this:
+    return { product: formatted, source: data.source, metadata }
+  })
+```
+</details>
+
+## Example: Parallel Operations
+
+Execute multiple independent operations concurrently with `Effect.all`:
+
+```typescript
 import { Effect, fail, all } from "effect"
 
 const fetchDashboard = (userId: string) => gen {
@@ -291,65 +278,6 @@ const fetchDashboard = (userId: string) => gen {
 }
 ```
 
-### Nested Gen Blocks for Scoped Operations
-
-Use nested gen blocks to create logical scopes for complex operations:
-
-```typescript
-// Instead of this:
-import { Effect } from "effect"
-
-const buildUserReport = (userId: string) =>
-  Effect.gen(function* () {
-    const user = yield* getUser(userId)
-
-    if (!user) {
-      return yield* Effect.fail(new NotFoundError("User"))
-    }
-
-    const summary = yield* Effect.gen(function* () {
-      const { orders, total } = yield* fetchOrders(user.id)
-      const formatted = yield* formatCurrency(total)
-      yield* cacheOrderSummary(user.id, formatted)
-      return { count: orders.length, total: formatted }
-    })
-
-    const activity = yield* Effect.gen(function* () {
-      const events = yield* getRecentActivity(user.id)
-      const filtered = events.filter(e => e.type === 'purchase')
-      return filtered.slice(0, 10)
-    })
-
-    return { user, summary, activity }
-  })
-
-// Write this:
-import { Effect, fail } from "effect"
-
-const buildUserReport = (userId: string) => gen {
-  user <- getUser(userId)
-
-  if (!user) {
-    return _ <- fail(new NotFoundError("User"))
-  }
-
-  summary <- gen {
-    { orders, total } <- fetchOrders(user.id)
-    formatted <- formatCurrency(total)
-    _ <- cacheOrderSummary(user.id, formatted)
-    return { count: orders.length, total: formatted }
-  }
-
-  activity <- gen {
-    events <- getRecentActivity(user.id)
-    let filtered = events.filter(e => e.type === 'purchase')
-    return filtered.slice(0, 10)
-  }
-
-  return { user, summary, activity }
-}
-```
-
 ## Development
 
 ```bash
@@ -363,8 +291,9 @@ pnpm test:integration
 
 - `packages/core/` - Core scanner and transformer (`effect-sugar-core`)
 - `packages/tsc-plugin/` - ts-patch transformer for tsc (`effect-sugar-tsc`)
+- `packages/esbuild-plugin/` - esbuild plugin (`effect-sugar-esbuild`)
 - `packages/vscode-extension/` - VSCode extension with bundled TS plugin
-- `packages/vite-plugin/` - ⚠️ Deprecated - Vite plugin + tsx loader (`effect-sugar-vite`)
+- `packages/vite-plugin/` - ⚠️ Deprecated - Vite plugin (`effect-sugar-vite`)
 
 ## License
 
