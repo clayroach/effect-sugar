@@ -19,6 +19,7 @@ const PACKAGES = [
   'packages/core',
   'packages/vite-plugin',
   'packages/tsc-plugin',
+  'packages/esbuild-plugin',
   'packages/vscode-extension/ts-plugin'
 ]
 
