@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "prepare": "ts-patch install -s",
-    "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "build": "tspc --project tsconfig.build.json",
+    "typecheck": "tspc --noEmit --project tsconfig.build.json"
   },
   "dependencies": {
     "effect": "^3.19.8",

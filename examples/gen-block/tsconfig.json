@@ -12,12 +12,9 @@
     "plugins": [
       {
         "name": "effect-sugar-ts-plugin"
-      },
-      {
-        "name": "effect-sugar-tsc",
-        "transform": "effect-sugar-tsc/transform",
-        "transformProgram": true
       }
+      // NOTE: tsc-plugin (effect-sugar-tsc) is incompatible with Language Service
+      // Use tsconfig.build.json for compilation instead
     ]
   },
   "include": ["*.ts"],

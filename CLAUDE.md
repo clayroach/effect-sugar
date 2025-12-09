@@ -51,7 +51,7 @@ effect-sugar/
 │   ├── vscode-extension/   # VSCode extension (bundles ts-plugin)
 │   │   ├── src/            # Extension source
 │   │   └── ts-plugin/      # TypeScript language service plugin
-│   └── vite-plugin/        # ⚠️ DEPRECATED - Vite plugin + tsx loader
+│   └── vite-plugin/        # Vite plugin + tsx loader (effect-sugar-vite)
 │       ├── src/
 │       │   ├── index.ts        # Vite plugin entry point
 │       │   ├── transform.ts    # Transformation with source maps (MagicString)
@@ -91,28 +91,35 @@ const program = Effect.gen(function* () {
 
 ### TypeScript Compiler (tsc via ts-patch)
 
-**Recommended approach** for all projects:
+**IMPORTANT**: The tsc-plugin (`effect-sugar-tsc`) uses ts-patch's `transformProgram` API, which is **incompatible with TypeScript's Language Service**. You must use **separate tsconfig files** for IDE and compilation to avoid crashes.
+
+**Setup:**
 
 ```bash
 pnpm add -D effect-sugar-tsc ts-patch
 ```
 
+**1. Create `tsconfig.json`** (for IDE/Language Service):
 ```json
-// package.json
-{
-  "scripts": {
-    "prepare": "ts-patch install -s"
-  }
-}
-```
-
-```json
-// tsconfig.json
 {
   "compilerOptions": {
     "plugins": [
       {
-        "name": "effect-sugar-tsc",
+        "name": "effect-sugar-ts-plugin"  // For VSCode/IDE support
+      }
+    ]
+  }
+}
+```
+
+**2. Create `tsconfig.build.json`** (for compilation):
+```json
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "effect-sugar-tsc",  // For tsc compilation
         "transform": "effect-sugar-tsc/transform",
         "transformProgram": true
       }
@@ -120,6 +127,23 @@ pnpm add -D effect-sugar-tsc ts-patch
   }
 }
 ```
+
+**3. Update `package.json`:**
+```json
+{
+  "scripts": {
+    "prepare": "ts-patch install -s",
+    "build": "tspc --project tsconfig.build.json",
+    "typecheck": "tspc --noEmit --project tsconfig.build.json"
+  }
+}
+```
+
+**Why separate configs?**
+- ts-patch's `transformProgram` creates new TypeScript Programs
+- This corrupts Language Service's incremental compilation state
+- Results in "Cannot read properties of undefined (reading 'resolutions')" crashes
+- Separate configs ensure tsc-plugin only runs during actual compilation
 
 **Flow:** `.ts` files → ts-patch intercepts getSourceFile → transforms `gen { }` → TypeScript parses valid code → compiles
 
@@ -222,7 +246,7 @@ return info  // TypeScript still thinks info could be null
 - **Phase 1**: Complete (parser, generator, unit tests)
 - **Phase 2**: Complete (TypeScript integration, VSCode extension)
 - **Phase 3**: Complete (ts-patch transformer - `effect-sugar-tsc`)
-- **Vite plugin**: ⚠️ Deprecated - use ts-patch transformer instead
+- **Vite plugin**: Recommended for Vite projects - no separate config needed
 
 See GitHub Issues for specifications and roadmap.
 

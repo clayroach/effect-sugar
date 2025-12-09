@@ -41,22 +41,88 @@ const buildReport = (customerId: string) =>
   })
 ```
 
-## Quick Start (Recommended Setup)
+## Quick Start
 
-This is the recommended setup for most projects. It uses standard TypeScript compilation with IDE support.
+Choose the setup that best fits your project:
 
-### 1. Install Dependencies
+### Option A: Vite (Recommended for New Projects)
+
+**Simplest setup** - single config, works with IDE and build together.
+
+```bash
+pnpm add -D effect-sugar-vite esbuild
+```
+
+See [Vite Setup](#vite-plugin-recommended) below for configuration.
+
+### Option B: TypeScript Compiler (tsc)
+
+**For projects using standard tsc** - requires separate configs for IDE and build.
 
 ```bash
 pnpm add -D effect-sugar-tsc ts-patch
 ```
 
-### 2. Configure TypeScript
+See [TypeScript Compiler Setup](#typescript-compiler-tsc-via-ts-patch) below for configuration.
 
-Add the transformer plugin to `tsconfig.json`:
+## Installation Options
+
+### Vite Plugin (Recommended)
+
+**Best choice for most projects** - single config works for both IDE and build, no crashes.
+
+```bash
+pnpm add -D effect-sugar-vite esbuild
+```
+
+Configure in `vite.config.ts`:
+
+```typescript
+import { defineConfig } from 'vite'
+import effectSugar from 'effect-sugar-vite'
+
+export default defineConfig({
+  plugins: [effectSugar()]
+})
+```
+
+And add the TypeScript plugin to `tsconfig.json` for IDE support:
 
 ```json
 {
+  "compilerOptions": {
+    "plugins": [
+      { "name": "effect-sugar-ts-plugin" }
+    ]
+  }
+}
+```
+
+That's it! Vite handles transformation during build, and the ts-plugin provides IDE features.
+
+### TypeScript Compiler (tsc via ts-patch)
+
+**IMPORTANT**: The tsc-plugin is incompatible with TypeScript's Language Service (VSCode, WebStorm, etc.) and will cause crashes if used in the same config as the IDE plugin.
+
+**Create two separate tsconfig files:**
+
+**`tsconfig.json`** (for IDE/Language Service):
+```json
+{
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "effect-sugar-ts-plugin"
+      }
+    ]
+  }
+}
+```
+
+**`tsconfig.build.json`** (for compilation):
+```json
+{
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "plugins": [
       {
@@ -76,14 +142,15 @@ Add a prepare script to `package.json`:
 ```json
 {
   "scripts": {
-    "prepare": "ts-patch install -s"
+    "prepare": "ts-patch install -s",
+    "build": "tspc --project tsconfig.build.json"
   }
 }
 ```
 
 ### 4. Install
 
-Run `pnpm install` to trigger the prepare script. You can now use `tsc` normally and gen blocks will be transformed during compilation.
+Run `pnpm install` to trigger the prepare script. Then use `pnpm build` to compile with gen block support.
 
 ## IDE Support (VSCode Recommended)
 
