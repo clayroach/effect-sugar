@@ -95,17 +95,33 @@ const transformer: ProgramTransformer = (
   _config: PluginConfig,
   { ts: typescript }: ProgramTransformerExtras
 ): ts.Program => {
-  // CRITICAL: Detect if we're in Language Service context
-  // If yes, skip transformation and let ts-plugin handle it
-  // This prevents conflicts when both plugins are enabled
-  const isLanguageService = detectLanguageServiceContext(program, host)
+  // CRITICAL: The tsc-plugin's transformProgram is fundamentally incompatible
+  // with TypeScript's Language Service due to how it creates new Programs.
+  //
+  // When used in Language Service context, it corrupts TypeScript's internal
+  // module resolution cache, causing crashes.
+  //
+  // Solution: ALWAYS skip transformation during Language Service.
+  // The ts-plugin (effect-sugar-ts-plugin) handles IDE features instead.
 
-  if (isLanguageService) {
-    console.log('[effect-sugar-tsc] Language Service detected - delegating to ts-plugin')
+  // Quick check: If we're being called during Language Service initialization,
+  // just return the program unchanged. The mere act of creating a new Program
+  // breaks the Language Service's incremental state.
+
+  // The presence of getScriptSnapshot is the most reliable indicator
+  if (host && (host as any).getScriptSnapshot) {
+    // Definitely Language Service - has LS-specific methods
     return program
   }
 
-  console.log('[effect-sugar-tsc] Compilation context detected - transforming gen blocks')
+  // Check for TS Server environment
+  if (process.env.TSSERVER_LOG_FILE) {
+    // Running in TS Server (Language Service)
+    return program
+  }
+
+  // If we reach here, we're likely in actual compilation context
+  console.log('[effect-sugar-tsc] Compilation context - transforming gen blocks')
 
   const compilerOptions = program.getCompilerOptions()
   const rootNames = program.getRootFileNames()
@@ -185,11 +201,14 @@ const transformer: ProgramTransformer = (
   }
 
   // Create a new program with the wrapped host
+  // NOTE: We do NOT pass the old program here because it breaks TypeScript's
+  // incremental compilation cache when running in Language Service context.
+  // This means no incremental compilation, but it's safer and avoids crashes.
   return typescript.createProgram(
     rootNames,
     compilerOptions,
-    wrappedHost,
-    program // oldProgram for incremental compilation
+    wrappedHost
+    // Intentionally NOT passing old program - causes cache corruption in Language Service
   )
 }
 

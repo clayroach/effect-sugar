@@ -2,61 +2,76 @@
 
 Syntactic sugar for [Effect-TS](https://effect.website/) with for-comprehension style `gen` blocks.
 
+## Example: Racing Multiple Data Sources
+
 ```typescript
+import { Effect, Race } from "effect"
+
 // Write this:
-import { Effect, fail } from "effect"
+const fetchUserProfile = (userId: string) => gen {
+  // Race between cache and API
+  cached <- Effect.promise(() => cache.get(userId))
+  [profile, stats] <- Race.race(
+    fetchFromPrimary(userId),
+    fetchFromBackup(userId)
+  )
 
-const buildReport = (customerId: string) => gen {
-  customer <- getCustomer(customerId)
+  // Validate and enrich
+  _ <- validateProfile(profile)
+  enriched <- enrichWithStats(profile, stats)
 
-  if (!customer) {
-    return _ <- fail(new NotFoundError("Customer"))
-  }
+  // Cache the result
+  _ <- Effect.promise(() => cache.set(userId, enriched))
 
-  { orders, invoices } <- fetchCustomerData(customer.id)
-  _ <- validateDataIntegrity(orders, invoices)
-  let total = orders.reduce((sum, o) => sum + o.amount, 0)
-  formatted <- formatCurrency(total, customer.locale)
-
-  return { customer, orders, total: formatted }
+  return enriched
 }
 
 // Instead of this:
-import { Effect } from "effect"
-
-const buildReport = (customerId: string) =>
+const fetchUserProfile = (userId: string) =>
   Effect.gen(function* () {
-    const customer = yield* getCustomer(customerId)
+    const cached = yield* Effect.promise(() => cache.get(userId))
+    const [profile, stats] = yield* Race.race(
+      fetchFromPrimary(userId),
+      fetchFromBackup(userId)
+    )
 
-    if (!customer) {
-      return yield* Effect.fail(new NotFoundError("Customer"))
-    }
+    yield* validateProfile(profile)
+    const enriched = yield* enrichWithStats(profile, stats)
+    yield* Effect.promise(() => cache.set(userId, enriched))
 
-    const { orders, invoices } = yield* fetchCustomerData(customer.id)
-    yield* validateDataIntegrity(orders, invoices)
-    const total = orders.reduce((sum, o) => sum + o.amount, 0)
-    const formatted = yield* formatCurrency(total, customer.locale)
-
-    return { customer, orders, total: formatted }
+    return enriched
   })
 ```
 
-## Quick Start (Recommended Setup)
+## Quick Start
 
-This is the recommended setup for most projects. It uses standard TypeScript compilation with IDE support.
+### TypeScript Compiler (Recommended)
 
-### 1. Install Dependencies
+For projects using standard TypeScript compilation with tsc.
 
 ```bash
 pnpm add -D effect-sugar-tsc ts-patch
 ```
 
-### 2. Configure TypeScript
+## Installation Options
 
-Add the transformer plugin to `tsconfig.json`:
+### TypeScript Compiler (tsc via ts-patch)
 
+**1. Create `tsconfig.json`** for IDE support:
 ```json
 {
+  "compilerOptions": {
+    "plugins": [
+      { "name": "effect-sugar-ts-plugin" }
+    ]
+  }
+}
+```
+
+**2. Create `tsconfig.build.json`** for compilation:
+```json
+{
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "plugins": [
       {
@@ -69,21 +84,52 @@ Add the transformer plugin to `tsconfig.json`:
 }
 ```
 
-### 3. Auto-Patch TypeScript
-
-Add a prepare script to `package.json`:
-
+**3. Add build scripts** to `package.json`:
 ```json
 {
   "scripts": {
-    "prepare": "ts-patch install -s"
+    "prepare": "ts-patch install -s",
+    "build": "tspc --project tsconfig.build.json"
   }
 }
 ```
 
-### 4. Install
+**4. Install and build:**
+```bash
+pnpm install
+pnpm build
+```
 
-Run `pnpm install` to trigger the prepare script. You can now use `tsc` normally and gen blocks will be transformed during compilation.
+**Why separate configs?** The compilation transformer operates during TypeScript's program transformation phase, while the IDE plugin works at the language service level. Using separate configs ensures optimal performance and stability in both contexts.
+
+### Vite Plugin
+
+For Vite projects:
+
+```bash
+pnpm add -D effect-sugar-vite esbuild
+```
+
+Configure in `vite.config.ts`:
+```typescript
+import { defineConfig } from 'vite'
+import effectSugar from 'effect-sugar-vite'
+
+export default defineConfig({
+  plugins: [effectSugar()]
+})
+```
+
+Add to `tsconfig.json` for IDE support:
+```json
+{
+  "compilerOptions": {
+    "plugins": [
+      { "name": "effect-sugar-ts-plugin" }
+    ]
+  }
+}
+```
 
 ## IDE Support (VSCode Recommended)
 
