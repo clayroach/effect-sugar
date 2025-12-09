@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "effect-sugar-tsc",
+        "transform": "effect-sugar-tsc/transform",
+        "transformProgram": true
+      }
+    ]
+  }
+}

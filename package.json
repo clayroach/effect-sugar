@@ -16,7 +16,7 @@
     "clean": "turbo run clean && rm -rf node_modules target",
     "clean:cache": "turbo run clean --force && rm -rf node_modules .turbo target",
     "preprocess": "node scripts/preprocess.js examples",
-    "format": "node scripts/format-gen.js examples",
+    "format": "node packages/tsc-plugin/bin/format.js examples",
     "changeset": "changeset",
     "version": "changeset version",
     "publish": "turbo run build && changeset publish",
