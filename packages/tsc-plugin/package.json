@@ -1,11 +1,14 @@
 {
   "name": "effect-sugar-tsc",
-  "version": "0.2.0",
+  "version": "0.2.0-dev.20251209090450",
   "description": "ts-patch transformer for Effect-TS gen block syntax",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "effect-sugar-format": "./bin/format.js"
+  },
   "exports": {
     ".": {
       "require": "./dist/index.js",
@@ -24,7 +27,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "scripts": {
     "build": "tsc",

@@ -139,7 +139,33 @@ export default [
 
 ## Prettier Integration
 
-Prettier support is planned. For now, gen blocks work with standard Prettier TypeScript formatting.
+Format gen block code with Prettier using the `effect-sugar-format` CLI tool:
+
+```bash
+# Format specific files
+npx effect-sugar-format src/**/*.ts
+
+# Format directories
+npx effect-sugar-format src/ test/
+
+# Add to package.json scripts
+{
+  "scripts": {
+    "format": "effect-sugar-format src/"
+  }
+}
+```
+
+The CLI tool:
+1. Transforms `gen {}` → `Effect.gen()` before formatting
+2. Runs Prettier with your project's configuration
+3. Transforms back to `gen {}` syntax
+
+**Note:** The formatter requires `prettier` as a peer dependency. Install it with:
+
+```bash
+pnpm add -D prettier
+```
 
 ## Alternative Setups
 

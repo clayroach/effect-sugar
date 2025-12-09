@@ -1,3 +1,4 @@
-# Source files with custom gen { } syntax
-# These are formatted after transformation via npm run format:managed
-examples/
+# Generated files
+dist/
+target/
+node_modules/

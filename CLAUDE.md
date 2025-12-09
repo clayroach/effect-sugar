@@ -142,6 +142,35 @@ export default [
 ]
 ```
 
+### Prettier Integration
+
+Format gen block code using the `effect-sugar-format` CLI tool:
+
+```bash
+# Format specific files
+pnpm --filter effect-sugar-tsc exec effect-sugar-format src/**/*.ts
+
+# Format directories
+pnpm --filter effect-sugar-tsc exec effect-sugar-format src/ test/
+
+# Or install globally/locally and run directly
+npx effect-sugar-format src/
+```
+
+**How it works:**
+1. Transforms `gen {}` → `Effect.gen()` with markers
+2. Runs Prettier with your project's configuration
+3. Transforms back to `gen {}` syntax using markers
+
+**Project-level usage:** Add to root package.json:
+```json
+{
+  "scripts": {
+    "format": "pnpm --filter effect-sugar-tsc exec effect-sugar-format examples"
+  }
+}
+```
+
 ## Key Patterns
 
 ### Statement Types
