@@ -91,7 +91,7 @@ const program = Effect.gen(function* () {
 
 ### TypeScript Compiler (tsc via ts-patch)
 
-**IMPORTANT**: The tsc-plugin (`effect-sugar-tsc`) uses ts-patch's `transformProgram` API, which is **incompatible with TypeScript's Language Service**. You must use **separate tsconfig files** for IDE and compilation to avoid crashes.
+**Note**: The tsc-plugin uses ts-patch's `transformProgram` API for compilation. For optimal IDE and build performance, use separate tsconfig files.
 
 **Setup:**
 
@@ -140,10 +140,9 @@ pnpm add -D effect-sugar-tsc ts-patch
 ```
 
 **Why separate configs?**
-- ts-patch's `transformProgram` creates new TypeScript Programs
-- This corrupts Language Service's incremental compilation state
-- Results in "Cannot read properties of undefined (reading 'resolutions')" crashes
-- Separate configs ensure tsc-plugin only runs during actual compilation
+- The compilation transformer operates during TypeScript's program transformation phase
+- The IDE plugin works at the language service level
+- Separate configs ensure optimal performance and stability in both contexts
 
 **Flow:** `.ts` files → ts-patch intercepts getSourceFile → transforms `gen { }` → TypeScript parses valid code → compiles
 

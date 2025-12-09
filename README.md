@@ -2,92 +2,62 @@
 
 Syntactic sugar for [Effect-TS](https://effect.website/) with for-comprehension style `gen` blocks.
 
+## Example: Racing Multiple Data Sources
+
 ```typescript
+import { Effect, Race } from "effect"
+
 // Write this:
-import { Effect, fail } from "effect"
+const fetchUserProfile = (userId: string) => gen {
+  // Race between cache and API
+  cached <- Effect.promise(() => cache.get(userId))
+  [profile, stats] <- Race.race(
+    fetchFromPrimary(userId),
+    fetchFromBackup(userId)
+  )
 
-const buildReport = (customerId: string) => gen {
-  customer <- getCustomer(customerId)
+  // Validate and enrich
+  _ <- validateProfile(profile)
+  enriched <- enrichWithStats(profile, stats)
 
-  if (!customer) {
-    return _ <- fail(new NotFoundError("Customer"))
-  }
+  // Cache the result
+  _ <- Effect.promise(() => cache.set(userId, enriched))
 
-  { orders, invoices } <- fetchCustomerData(customer.id)
-  _ <- validateDataIntegrity(orders, invoices)
-  let total = orders.reduce((sum, o) => sum + o.amount, 0)
-  formatted <- formatCurrency(total, customer.locale)
-
-  return { customer, orders, total: formatted }
+  return enriched
 }
 
 // Instead of this:
-import { Effect } from "effect"
-
-const buildReport = (customerId: string) =>
+const fetchUserProfile = (userId: string) =>
   Effect.gen(function* () {
-    const customer = yield* getCustomer(customerId)
+    const cached = yield* Effect.promise(() => cache.get(userId))
+    const [profile, stats] = yield* Race.race(
+      fetchFromPrimary(userId),
+      fetchFromBackup(userId)
+    )
 
-    if (!customer) {
-      return yield* Effect.fail(new NotFoundError("Customer"))
-    }
+    yield* validateProfile(profile)
+    const enriched = yield* enrichWithStats(profile, stats)
+    yield* Effect.promise(() => cache.set(userId, enriched))
 
-    const { orders, invoices } = yield* fetchCustomerData(customer.id)
-    yield* validateDataIntegrity(orders, invoices)
-    const total = orders.reduce((sum, o) => sum + o.amount, 0)
-    const formatted = yield* formatCurrency(total, customer.locale)
-
-    return { customer, orders, total: formatted }
+    return enriched
   })
 ```
 
 ## Quick Start
 
-Choose the setup that best fits your project:
+### TypeScript Compiler (Recommended)
 
-### Option A: Vite (Recommended for New Projects)
-
-**Simplest setup** - single config, works with IDE and build together.
-
-```bash
-pnpm add -D effect-sugar-vite esbuild
-```
-
-See [Vite Setup](#vite-plugin-recommended) below for configuration.
-
-### Option B: TypeScript Compiler (tsc)
-
-**For projects using standard tsc** - requires separate configs for IDE and build.
+For projects using standard TypeScript compilation with tsc.
 
 ```bash
 pnpm add -D effect-sugar-tsc ts-patch
 ```
 
-See [TypeScript Compiler Setup](#typescript-compiler-tsc-via-ts-patch) below for configuration.
-
 ## Installation Options
 
-### Vite Plugin (Recommended)
+### TypeScript Compiler (tsc via ts-patch)
 
-**Best choice for most projects** - single config works for both IDE and build, no crashes.
-
-```bash
-pnpm add -D effect-sugar-vite esbuild
-```
-
-Configure in `vite.config.ts`:
-
-```typescript
-import { defineConfig } from 'vite'
-import effectSugar from 'effect-sugar-vite'
-
-export default defineConfig({
-  plugins: [effectSugar()]
-})
-```
-
-And add the TypeScript plugin to `tsconfig.json` for IDE support:
-
+**1. Create `tsconfig.json`** for IDE support:
 ```json
 {
   "compilerOptions": {
@@ -98,28 +68,7 @@ And add the TypeScript plugin to `tsconfig.json` for IDE support:
 }
 ```
 
-That's it! Vite handles transformation during build, and the ts-plugin provides IDE features.
-
-### TypeScript Compiler (tsc via ts-patch)
-
-**IMPORTANT**: The tsc-plugin is incompatible with TypeScript's Language Service (VSCode, WebStorm, etc.) and will cause crashes if used in the same config as the IDE plugin.
-
-**Create two separate tsconfig files:**
-
-**`tsconfig.json`** (for IDE/Language Service):
-```json
-{
-  "compilerOptions": {
-    "plugins": [
-      {
-        "name": "effect-sugar-ts-plugin"
-      }
-    ]
-  }
-}
-```
-
-**`tsconfig.build.json`** (for compilation):
+**2. Create `tsconfig.build.json`** for compilation:
 ```json
 {
   "extends": "./tsconfig.json",
@@ -135,10 +84,7 @@ That's it! Vite handles transformation during build, and the ts-plugin provides 
 }
 ```
 
-### 3. Auto-Patch TypeScript
-
-Add a prepare script to `package.json`:
-
+**3. Add build scripts** to `package.json`:
 ```json
 {
   "scripts": {
@@ -148,9 +94,42 @@ Add a prepare script to `package.json`:
 }
 ```
 
-### 4. Install
+**4. Install and build:**
+```bash
+pnpm install
+pnpm build
+```
 
-Run `pnpm install` to trigger the prepare script. Then use `pnpm build` to compile with gen block support.
+**Why separate configs?** The compilation transformer operates during TypeScript's program transformation phase, while the IDE plugin works at the language service level. Using separate configs ensures optimal performance and stability in both contexts.
+
+### Vite Plugin
+
+For Vite projects:
+
+```bash
+pnpm add -D effect-sugar-vite esbuild
+```
+
+Configure in `vite.config.ts`:
+```typescript
+import { defineConfig } from 'vite'
+import effectSugar from 'effect-sugar-vite'
+
+export default defineConfig({
+  plugins: [effectSugar()]
+})
+```
+
+Add to `tsconfig.json` for IDE support:
+```json
+{
+  "compilerOptions": {
+    "plugins": [
+      { "name": "effect-sugar-ts-plugin" }
+    ]
+  }
+}
+```
 
 ## IDE Support (VSCode Recommended)
 
