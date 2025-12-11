@@ -340,12 +340,14 @@ pnpm test:integration
 
 ## Release Process with Changesets
 
+Uses npm OIDC trusted publishing - no long-lived secrets required.
+
 ### Workflow
 
-1. **Create changeset** (describes the change)
-2. **Run `pnpm changeset version`** (bumps versions, updates changelogs)
-3. **Commit & push** to main
-4. **CI publishes** to npm automatically
+1. **Create changeset** and push to main
+2. **CI creates "Version Packages" PR** automatically
+3. **Merge the Version PR** to trigger publish
+4. **Packages published** to npm via OIDC with provenance
 
 ### Step-by-Step
 
@@ -353,15 +355,12 @@ pnpm test:integration
 # 1. Create changeset (interactive prompt)
 pnpm changeset
 
-# 2. Version packages (bumps versions, updates changelogs, deletes changeset)
-pnpm changeset version
-
-# 3. Commit everything
-git add -A
-git commit -m "chore: version packages"
-
-# 4. Push (CI handles publishing)
+# 2. Commit and push
+git add .changeset/
+git commit -m "chore: add changeset for <description>"
 git push origin main
+
+# 3. CI creates Version PR → merge it → CI publishes
 ```
 
 ### Changeset Format
@@ -385,8 +384,11 @@ Version types:
 - Ignored packages (not published): `effect-sugar`, `gen-block-examples`
 - Release workflow: `.github/workflows/release.yml`
 
-**Secrets Required:**
-- `NPM_TOKEN`: npm authentication token
+**npm Trusted Publisher Setup:**
+Each package needs OIDC configured at npmjs.com → Package → Settings → Trusted Publisher:
+- Organization: `clayroach`
+- Repository: `effect-sugar`
+- Workflow: `release.yml`
 
 **Local Alternative (Dev Releases Only):**
 ```bash
