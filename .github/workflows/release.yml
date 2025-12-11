@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +24,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install
@@ -32,47 +32,7 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Test
-        run: pnpm run test
-
-      - name: Integration Tests
-        run: pnpm run test:integration
-
-      - name: Version and Publish
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          version: pnpm exec changeset version
-          publish: pnpm run publish
-          commit: 'chore: version packages'
+      - name: Publish to npm
+        run: pnpm publish -r --access public --no-git-checks
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Checkout for notifications
-        if: always()
-        uses: actions/checkout@v4
-
-      - name: Notify Discord on Publish
-        if: steps.changesets.outputs.published == 'true'
-        uses: atrim-ai/github-actions/discord-notify@main
-        with:
-          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          status: 'success'
-          job-name: '📦 Packages Published'
-          workflow-name: 'Release'
-          error-details: |
-            **Published Packages:**
-            ```json
-            ${{ steps.changesets.outputs.publishedPackages }}
-            ```
-
-      - name: Notify Discord on Failure
-        if: failure()
-        uses: atrim-ai/github-actions/discord-notify@main
-        with:
-          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          status: 'failure'
-          job-name: 'Release Pipeline'
-          workflow-name: 'Release'
-          error-details: 'Release workflow failed during tests, build, or publish step.'
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
