@@ -107,9 +107,6 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.25
-      prettier:
-        specifier: ^3.0.0
-        version: 3.6.2
       ts-patch:
         specifier: ^3.0.0
         version: 3.3.0
