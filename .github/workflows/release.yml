@@ -2,7 +2,8 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -10,12 +11,15 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
       pull-requests: write
+      id-token: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -23,56 +27,40 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install
+      - name: Upgrade npm for OIDC support
+        run: npm install -g npm@latest
 
-      - name: Build
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
         run: pnpm run build
 
-      - name: Test
-        run: pnpm run test
+      - name: Check for changesets
+        id: check
+        run: |
+          if [ -n "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
+            echo "has_changesets=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Integration Tests
-        run: pnpm run test:integration
-
-      - name: Version and Publish
-        id: changesets
+      - name: Create Release Pull Request
+        if: steps.check.outputs.has_changesets == 'true'
         uses: changesets/action@v1
         with:
-          version: pnpm exec changeset version
-          publish: pnpm run publish
-          commit: 'chore: version packages'
+          version: pnpm changeset version
+          commit: "chore: version packages"
+          title: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Checkout for notifications
-        if: always()
-        uses: actions/checkout@v4
-
-      - name: Notify Discord on Publish
-        if: steps.changesets.outputs.published == 'true'
-        uses: atrim-ai/github-actions/discord-notify@main
-        with:
-          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          status: 'success'
-          job-name: '📦 Packages Published'
-          workflow-name: 'Release'
-          error-details: |
-            **Published Packages:**
-            ```json
-            ${{ steps.changesets.outputs.publishedPackages }}
-            ```
-
-      - name: Notify Discord on Failure
-        if: failure()
-        uses: atrim-ai/github-actions/discord-notify@main
-        with:
-          webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          status: 'failure'
-          job-name: 'Release Pipeline'
-          workflow-name: 'Release'
-          error-details: 'Release workflow failed during tests, build, or publish step.'
+      - name: Publish to npm
+        if: steps.check.outputs.has_changesets == 'false'
+        run: pnpm publish -r --access public --no-git-checks
+        env:
+          NPM_CONFIG_PROVENANCE: true

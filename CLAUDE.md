@@ -338,64 +338,57 @@ pnpm test
 pnpm test:integration
 ```
 
-## Release Process with Changesets (Automated via GitHub Actions)
+## Release Process with Changesets
 
-**IMPORTANT: This is fully automated. Do NOT manually run release commands locally.**
+Uses npm OIDC trusted publishing - no long-lived secrets required.
 
-### 1. During Development (Feature Branch)
+### Workflow
 
-Create a changeset when your feature/fix is ready to be released:
+1. **Create changeset** and push to main
+2. **CI creates "Version Packages" PR** automatically
+3. **Merge the Version PR** to trigger publish
+4. **Packages published** to npm via OIDC with provenance
+
+### Step-by-Step
 
 ```bash
-# Interactive prompt to select packages and bump type (major/minor/patch)
+# 1. Create changeset (interactive prompt)
 pnpm changeset
 
-# Or manually create .changeset/<slug>.md with format:
-# ---
-# "package-name": minor
-# "other-package": patch
-# ---
-# Description of changes for the changelog
+# 2. Commit and push
+git add .changeset/
+git commit -m "chore: add changeset for <description>"
+git push origin main
+
+# 3. CI creates Version PR → merge it → CI publishes
 ```
 
-Commit the changeset file(s) as part of your feature branch PR.
+### Changeset Format
 
-### 2. Merge PR to Main
+```markdown
+---
+"effect-sugar-core": patch
+---
 
-When your PR is merged to main, the GitHub Actions release workflow (`.github/workflows/release.yml`) automatically:
+fix: description of the fix
+```
 
-1. **Detects changesets** in the repository
-2. **Creates a Release PR** that:
-   - Runs `pnpm changeset version` (bumps versions, generates changelogs)
-   - Commits all version changes with `chore: version packages`
-3. **Auto-merges the Release PR** back to main
-4. **On the second push to main** (from Release PR merge):
-   - Runs `pnpm run publish` which executes:
-     - `turbo run build` (full clean build)
-     - `changeset publish` (publishes to npm with NPM_TOKEN secret)
-   - Creates git tags for each published package
+Version types:
+- `patch` - Bug fixes (0.0.X)
+- `minor` - New features (0.X.0)
+- `major` - Breaking changes (X.0.0)
 
-### 3. What NOT to Do
-
-❌ **DO NOT run locally:**
-- `pnpm changeset version`
-- `pnpm changeset publish`
-- Manual version bumps
-- Manual npm publishes
-
-These are handled entirely by GitHub Actions using the `changesets/action@v1` workflow.
-
-### 4. Configuration
+### Configuration
 
 - Changeset config: `.changeset/config.json`
 - Ignored packages (not published): `effect-sugar`, `gen-block-examples`
-- Base branch: `main`
-- Access: public
 - Release workflow: `.github/workflows/release.yml`
 
-**Secrets Required:**
-- `NPM_TOKEN`: npm authentication token
-- `CHANGESET_TOKEN`: GitHub token (for auto-merge of Release PR)
+**npm Trusted Publisher Setup:**
+Each package needs OIDC configured at npmjs.com → Package → Settings → Trusted Publisher:
+- Organization: `clayroach`
+- Repository: `effect-sugar`
+- Workflow: `release.yml`
 
 **Local Alternative (Dev Releases Only):**
 ```bash
