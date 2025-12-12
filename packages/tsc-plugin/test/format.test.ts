@@ -219,6 +219,62 @@ const b = gen {
 
         expect(transformBack(input)).toBe(expected)
       })
+
+      it('should normalize Prettier-style indentation (extra 2 spaces)', () => {
+        // When Prettier formats Effect.gen(function* () { ... }), it adds extra indentation
+        // to the callback body. We need to remove this excess indentation when transforming back.
+        const input = `const program = Effect.gen(/* __EFFECT_SUGAR__ */ function* () {
+    const user = yield* getUser("123");
+    const profile = yield* getProfile(user.id);
+    return { user, profile };
+  });`
+
+        const expected = `const program = gen {
+  user <- getUser("123");
+  profile <- getProfile(user.id);
+  return { user, profile };
+};`
+
+        expect(transformBack(input)).toBe(expected)
+      })
+
+      it('should normalize indentation for nested gen blocks', () => {
+        const input = `function example() {
+  const result = Effect.gen(/* __EFFECT_SUGAR__ */ function* () {
+      const x = yield* getValue();
+      return x;
+    });
+  return result;
+}`
+
+        const expected = `function example() {
+  const result = gen {
+    x <- getValue();
+    return x;
+  };
+  return result;
+}`
+
+        expect(transformBack(input)).toBe(expected)
+      })
+
+      it('should handle regex literals with braces', () => {
+        // Regex like /\${([^}]+)}/g contains { and } that should NOT be counted as braces
+        const input = `const fn = Effect.gen(/* __EFFECT_SUGAR__ */ function* () {
+    const result = yield* processData();
+    const replaced = text.replace(/\\$\\{([^}]+)\\}/g, (m) => m);
+    return replaced;
+  },
+);`
+
+        const expected = `const fn = gen {
+  result <- processData();
+  const replaced = text.replace(/\\$\\{([^}]+)\\}/g, (m) => m);
+  return replaced;
+};`
+
+        expect(transformBack(input)).toBe(expected)
+      })
     })
   })
 
