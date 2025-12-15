@@ -1,6 +1,6 @@
 {
   "name": "effect-sugar-tsc",
-  "version": "0.2.0-dev.20251209090450",
+  "version": "0.2.0",
   "description": "ts-patch transformer for Effect-TS gen block syntax",
   "type": "module",
   "main": "./dist/index.js",
