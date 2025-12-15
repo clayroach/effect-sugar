@@ -49,6 +49,8 @@ export interface FormatResult {
   filePath: string
   hasGenBlocks: boolean
   formatted: boolean
+  /** Whether the content changed from the original (only set when write: false) */
+  changed?: boolean
   content?: string
   error?: Error
 }
@@ -401,10 +403,10 @@ export async function formatFile(
     }
 
     // Read file
-    let source = await fs.readFile(absolutePath, 'utf-8')
+    const originalSource = await fs.readFile(absolutePath, 'utf-8')
 
     // Normalize multi-line bind statements before processing
-    source = normalizeBindStatements(source)
+    let source = normalizeBindStatements(originalSource)
 
     // Check if file has gen blocks
     if (!hasGenBlocks(source)) {
@@ -424,6 +426,7 @@ export async function formatFile(
           filePath,
           hasGenBlocks: false,
           formatted: true,
+          changed: options.write === false ? originalSource !== formatted : undefined,
           content: options.write === false ? formatted : undefined
         }
       } catch (error) {
@@ -468,6 +471,7 @@ export async function formatFile(
       filePath,
       hasGenBlocks: true,
       formatted: true,
+      changed: options.write === false ? originalSource !== restored : undefined,
       content: options.write === false ? restored : undefined
     }
   } catch (error) {
