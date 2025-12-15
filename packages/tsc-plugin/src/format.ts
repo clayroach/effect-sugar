@@ -12,6 +12,26 @@ import { transformSource, hasGenBlocks, findGenBlocks } from 'effect-sugar-core'
  */
 const GEN_MARKER = '/* __EFFECT_SUGAR__ */'
 
+/**
+ * Normalize multi-line bind statements to single lines
+ *
+ * Transforms:
+ *   result <-
+ *   Effect.try({
+ *
+ * To:
+ *   result <- Effect.try({
+ *
+ * This ensures the scanner can properly detect bind statements.
+ */
+export function normalizeBindStatements(source: string): string {
+  // Pattern: identifier/pattern followed by <- on one line, then whitespace, then expression
+  // We want to join these into a single line
+  const multiLineBindPattern = /^(\s*)(\w+|\[[\w\s,.\[\]{}:]+\]|\{[\w\s,.:]+\})\s*<-\s*\n\s*/gm
+
+  return source.replace(multiLineBindPattern, '$1$2 <- ')
+}
+
 export interface FormatOptions {
   /**
    * Whether to write formatted content back to files
@@ -31,6 +51,72 @@ export interface FormatResult {
   formatted: boolean
   content?: string
   error?: Error
+}
+
+/**
+ * Get the indentation of the line containing a given position
+ */
+function getLineIndent(code: string, pos: number): string {
+  // Find the start of the line
+  let lineStart = pos
+  while (lineStart > 0 && code[lineStart - 1] !== '\n') {
+    lineStart--
+  }
+
+  // Extract leading whitespace
+  let indent = ''
+  while (lineStart < pos && (code[lineStart] === ' ' || code[lineStart] === '\t')) {
+    indent += code[lineStart]
+    lineStart++
+  }
+
+  return indent
+}
+
+/**
+ * Find minimum indentation of non-empty lines in code
+ */
+function findMinIndent(code: string): number {
+  const lines = code.split('\n')
+  let minIndent = Infinity
+
+  for (const line of lines) {
+    // Skip empty lines
+    if (line.trim() === '') continue
+
+    // Count leading spaces
+    const leadingSpaces = line.match(/^[ \t]*/)?.[0] || ''
+    const indent = leadingSpaces.length
+    if (indent < minIndent) {
+      minIndent = indent
+    }
+  }
+
+  return minIndent === Infinity ? 0 : minIndent
+}
+
+/**
+ * Remove a fixed number of leading spaces/tabs from each line
+ */
+function dedent(code: string, amount: number): string {
+  if (amount <= 0) return code
+
+  const lines = code.split('\n')
+  return lines
+    .map((line) => {
+      // Don't modify truly empty lines (no characters at all)
+      if (line === '') return line
+
+      // Remove up to `amount` characters of leading whitespace
+      let removed = 0
+      let i = 0
+      while (i < line.length && removed < amount && (line[i] === ' ' || line[i] === '\t')) {
+        removed++
+        i++
+      }
+      return line.slice(i)
+    })
+    .join('\n')
 }
 
 /**
@@ -61,6 +147,9 @@ export function transformBack(formattedCode: string): string {
   while ((match = genPattern.exec(formattedCode)) !== null) {
     const startPos = match.index
 
+    // Get the base indentation of the Effect.gen line
+    const baseIndent = getLineIndent(formattedCode, startPos)
+
     // Find the opening brace of the function body
     const openBracePos = formattedCode.indexOf('{', startPos + match[0].length - 1)
 
@@ -70,13 +159,14 @@ export function transformBack(formattedCode: string): string {
     let inString: string | null = null
     let inComment = false
     let inLineComment = false
+    let inRegex = false
 
     while (pos < formattedCode.length && depth > 0) {
       const char = formattedCode[pos]
       const nextChar = formattedCode[pos + 1]
 
       // Handle line comments
-      if (!inString && !inComment && char === '/' && nextChar === '/') {
+      if (!inString && !inComment && !inRegex && char === '/' && nextChar === '/') {
         inLineComment = true
         pos += 2
         continue
@@ -91,7 +181,7 @@ export function transformBack(formattedCode: string): string {
       }
 
       // Handle block comments
-      if (!inString && !inLineComment && char === '/' && nextChar === '*') {
+      if (!inString && !inLineComment && !inRegex && char === '/' && nextChar === '*') {
         inComment = true
         pos += 2
         continue
@@ -107,9 +197,67 @@ export function transformBack(formattedCode: string): string {
         continue
       }
 
+      // Handle regex literals
+      // A '/' starts a regex if preceded by certain tokens (simplified heuristic)
+      if (!inString && !inComment && !inLineComment && !inRegex && char === '/') {
+        // Look back to see if this could be a regex start
+        // Common patterns: after (, [, {, ,, =, :, ;, !, &, |, ?, newline, or start
+        let lookBack = pos - 1
+        while (lookBack >= 0 && /\s/.test(formattedCode[lookBack]!)) {
+          lookBack--
+        }
+        const prevChar = lookBack >= 0 ? formattedCode[lookBack] : ''
+        // These characters typically precede a regex literal
+        if (
+          prevChar === '' ||
+          prevChar === '(' ||
+          prevChar === '[' ||
+          prevChar === '{' ||
+          prevChar === ',' ||
+          prevChar === '=' ||
+          prevChar === ':' ||
+          prevChar === ';' ||
+          prevChar === '!' ||
+          prevChar === '&' ||
+          prevChar === '|' ||
+          prevChar === '?' ||
+          prevChar === '\n' ||
+          prevChar === 'n' // 'return', 'in', etc. - simplified
+        ) {
+          inRegex = true
+          pos++
+          continue
+        }
+      }
+
+      if (inRegex) {
+        // Handle escape sequences in regex
+        if (char === '\\' && pos + 1 < formattedCode.length) {
+          pos += 2
+          continue
+        }
+        // End of regex
+        if (char === '/') {
+          inRegex = false
+          // Skip regex flags
+          pos++
+          while (pos < formattedCode.length && /[gimsuy]/.test(formattedCode[pos]!)) {
+            pos++
+          }
+          continue
+        }
+        pos++
+        continue
+      }
+
       // Handle strings
       if (inString) {
-        if (char === inString && formattedCode[pos - 1] !== '\\') {
+        // Handle escape sequences
+        if (char === '\\' && pos + 1 < formattedCode.length) {
+          pos += 2
+          continue
+        }
+        if (char === inString) {
           inString = null
         }
         pos++
@@ -141,11 +289,32 @@ export function transformBack(formattedCode: string): string {
     // Transform statements back to gen syntax
     let transformedBody = bodyContent
       // const x = yield* expr → x <- expr
-      .replace(/const\s+(\w+)\s*=\s*yield\s*\*\s*/g, '$1 <- ')
+      // Handles simple identifiers, array destructuring, and object destructuring
+      .replace(/const\s+(\w+|\[[^\]]+\]|\{[^}]+\})\s*=\s*yield\s*\*\s*/g, '$1 <- ')
       // yield* expr (without assignment) → _ <- expr
       .replace(/yield\s*\*\s+/g, '_ <- ')
 
-    const replacement = `gen {${transformedBody}}`
+    // Normalize indentation
+    // The body content has extra indentation from being inside function* () { }
+    // We want content indented at baseIndent + 2 (one level inside gen {})
+    const currentMinIndent = findMinIndent(transformedBody)
+    const targetIndent = baseIndent.length + 2
+
+    if (currentMinIndent > targetIndent) {
+      // Remove excess indentation
+      const excessIndent = currentMinIndent - targetIndent
+      transformedBody = dedent(transformedBody, excessIndent)
+    }
+
+    // The body typically ends with "\n  " where the whitespace is for the closing brace
+    // After dedenting, this trailing whitespace becomes the correct indent for the closing }
+    // We need to ensure the closing brace is at baseIndent level
+    // Strip any trailing whitespace from body and add correct indent for closing brace
+    const trimmedBody = transformedBody.replace(/\s+$/, '')
+    const closingBraceIndent = trimmedBody.endsWith('\n') ? baseIndent : '\n' + baseIndent
+
+    // Build the replacement
+    const replacement = `gen {${trimmedBody}${closingBraceIndent}}`
 
     replacements.push({
       start: startPos,
@@ -232,7 +401,10 @@ export async function formatFile(
     }
 
     // Read file
-    const source = await fs.readFile(absolutePath, 'utf-8')
+    let source = await fs.readFile(absolutePath, 'utf-8')
+
+    // Normalize multi-line bind statements before processing
+    source = normalizeBindStatements(source)
 
     // Check if file has gen blocks
     if (!hasGenBlocks(source)) {

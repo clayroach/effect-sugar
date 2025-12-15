@@ -1,5 +1,28 @@
 import * as vscode from 'vscode'
-import * as prettier from 'prettier'
+import { transformSource, hasGenBlocks } from 'effect-sugar-core'
+
+/**
+ * Dynamically load prettier from the workspace or extension
+ */
+async function loadPrettier(documentPath: string): Promise<typeof import('prettier')> {
+  // Try to find prettier in the workspace first
+  const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(documentPath))
+
+  if (workspaceFolder) {
+    try {
+      // Try to require prettier from the workspace
+      const workspacePrettierPath = require.resolve('prettier', {
+        paths: [workspaceFolder.uri.fsPath]
+      })
+      return require(workspacePrettierPath)
+    } catch {
+      // Workspace doesn't have prettier, fall back
+    }
+  }
+
+  // Fall back to bundled prettier (requires prettier in node_modules)
+  return require('prettier')
+}
 
 interface GenBlockRange {
   start: number
@@ -7,108 +30,257 @@ interface GenBlockRange {
 }
 
 /**
- * Transform gen block content to valid JS for formatting
+ * Get the indentation of the line containing a given position
  */
-function genToJs(genBlockContent: string): string {
-  const braceStart = genBlockContent.indexOf('{')
-  const content = genBlockContent.slice(braceStart + 1, -1)
-
-  const transformed = content
-    .replace(/^(\s*)(\w+)\s*<-\s*/gm, '$1const $2 = /*BIND*/yield* ')
-    .replace(/^(\s*)let\s+(\w+)\s*=\s*/gm, '$1const $2 = /*LET*/')
-
-  return `Effect.gen(function* () {${transformed}})`
-}
-
-/**
- * Transform formatted JS back to gen block syntax
- */
-function jsToGen(jsContent: string): string {
-  const match = jsContent.match(/Effect\.gen\(function\*\s*\(\)\s*\{([\s\S]*)\}\)/)
-  if (!match) return jsContent
-
-  let content = match[1]
-  if (!content) return jsContent
-
-  content = content
-    // Replace: const x = /*BIND*/ yield* ... with x <- ...
-    // Handles multiline formatting with flexible whitespace
-    .replace(/const\s+(\w+)\s*=\s*\/\*BIND\*\/\s*yield\*\s*/gm, '$1 <- ')
-    .replace(/const\s+(\w+)\s*=\s*\/\*LET\*\/\s*/gm, 'let $1 = ')
-
-  return `gen {${content}}`
-}
-
-/**
- * Transform all gen blocks in text to valid JS
- */
-function transformGenBlocksToJs(text: string, blocks: GenBlockRange[]): string {
-  let result = text
-  let offset = 0
-
-  for (const block of blocks) {
-    const genBlock = text.slice(block.start, block.end)
-    const jsBlock = genToJs(genBlock)
-
-    const adjustedStart = block.start + offset
-    const adjustedEnd = block.end + offset
-    result = result.slice(0, adjustedStart) + jsBlock + result.slice(adjustedEnd)
-
-    offset += jsBlock.length - (block.end - block.start)
+function getLineIndent(code: string, pos: number): string {
+  let lineStart = pos
+  while (lineStart > 0 && code[lineStart - 1] !== '\n') {
+    lineStart--
   }
 
-  return result
+  let indent = ''
+  while (lineStart < pos && (code[lineStart] === ' ' || code[lineStart] === '\t')) {
+    indent += code[lineStart]
+    lineStart++
+  }
+
+  return indent
 }
 
 /**
- * Transform all Effect.gen blocks back to gen syntax
+ * Find minimum indentation of non-empty lines in code
  */
-function transformJsToGenBlocks(text: string): string {
-  const pattern = /Effect\.gen\(function\*\s*\(\)\s*\{/g
-  let result = text
-  let offset = 0
-  let match
+function findMinIndent(code: string): number {
+  const lines = code.split('\n')
+  let minIndent = Infinity
 
-  while ((match = pattern.exec(text)) !== null) {
-    const genStart = match.index
-    const braceStart = text.indexOf('{', genStart + 20)
+  for (const line of lines) {
+    if (line.trim() === '') continue
+    const leadingSpaces = line.match(/^[ \t]*/)?.[0] || ''
+    const indent = leadingSpaces.length
+    if (indent < minIndent) {
+      minIndent = indent
+    }
+  }
 
-    // Find matching brace
+  return minIndent === Infinity ? 0 : minIndent
+}
+
+/**
+ * Remove a fixed number of leading spaces/tabs from each line
+ */
+function dedent(code: string, amount: number): string {
+  if (amount <= 0) return code
+
+  const lines = code.split('\n')
+  return lines
+    .map((line) => {
+      if (line === '') return line
+      let removed = 0
+      let i = 0
+      while (i < line.length && removed < amount && (line[i] === ' ' || line[i] === '\t')) {
+        removed++
+        i++
+      }
+      return line.slice(i)
+    })
+    .join('\n')
+}
+
+/**
+ * Transform gen block content back to gen syntax after formatting
+ *
+ * This reverses the transformation done by effect-sugar-core.
+ * It looks for Effect.gen(/* __EFFECT_SUGAR__ *\/ function* () { ... })
+ * and converts it back to gen { ... }
+ */
+function transformBack(formattedCode: string): string {
+  const genPattern = new RegExp(
+    `Effect\\.gen\\s*\\(\\s*\\/\\*\\s*__EFFECT_SUGAR__\\s*\\*\\/\\s*function\\s*\\*\\s*\\(\\s*\\)\\s*\\{`,
+    'g'
+  )
+
+  if (!genPattern.test(formattedCode)) {
+    return formattedCode
+  }
+
+  genPattern.lastIndex = 0
+
+  let result = formattedCode
+  const replacements: Array<{ start: number; end: number; replacement: string }> = []
+
+  let match: RegExpExecArray | null
+  while ((match = genPattern.exec(formattedCode)) !== null) {
+    const startPos = match.index
+    const baseIndent = getLineIndent(formattedCode, startPos)
+    const openBracePos = formattedCode.indexOf('{', startPos + match[0].length - 1)
+
+    // Find matching closing brace
     let depth = 1
-    let pos = braceStart + 1
+    let pos = openBracePos + 1
     let inString: string | null = null
+    let inComment = false
+    let inLineComment = false
+    let inRegex = false
 
-    while (pos < text.length && depth > 0) {
-      const char = text[pos]
-      if (inString) {
-        if (char === inString && text[pos - 1] !== '\\') inString = null
+    while (pos < formattedCode.length && depth > 0) {
+      const char = formattedCode[pos]
+      const nextChar = formattedCode[pos + 1]
+
+      // Handle line comments
+      if (!inString && !inComment && !inRegex && char === '/' && nextChar === '/') {
+        inLineComment = true
+        pos += 2
+        continue
+      }
+
+      if (inLineComment) {
+        if (char === '\n') {
+          inLineComment = false
+        }
         pos++
         continue
       }
+
+      // Handle block comments
+      if (!inString && !inLineComment && !inRegex && char === '/' && nextChar === '*') {
+        inComment = true
+        pos += 2
+        continue
+      }
+
+      if (inComment) {
+        if (char === '*' && nextChar === '/') {
+          inComment = false
+          pos += 2
+          continue
+        }
+        pos++
+        continue
+      }
+
+      // Handle regex literals
+      if (!inString && !inComment && !inLineComment && !inRegex && char === '/') {
+        let lookBack = pos - 1
+        while (lookBack >= 0 && /\s/.test(formattedCode[lookBack]!)) {
+          lookBack--
+        }
+        const prevChar = lookBack >= 0 ? formattedCode[lookBack] : ''
+        if (
+          prevChar === '' ||
+          prevChar === '(' ||
+          prevChar === '[' ||
+          prevChar === '{' ||
+          prevChar === ',' ||
+          prevChar === '=' ||
+          prevChar === ':' ||
+          prevChar === ';' ||
+          prevChar === '!' ||
+          prevChar === '&' ||
+          prevChar === '|' ||
+          prevChar === '?' ||
+          prevChar === '\n' ||
+          prevChar === 'n'
+        ) {
+          inRegex = true
+          pos++
+          continue
+        }
+      }
+
+      if (inRegex) {
+        if (char === '\\' && pos + 1 < formattedCode.length) {
+          pos += 2
+          continue
+        }
+        if (char === '/') {
+          inRegex = false
+          pos++
+          while (pos < formattedCode.length && /[gimsuy]/.test(formattedCode[pos]!)) {
+            pos++
+          }
+          continue
+        }
+        pos++
+        continue
+      }
+
+      // Handle strings
+      if (inString) {
+        if (char === '\\' && pos + 1 < formattedCode.length) {
+          pos += 2
+          continue
+        }
+        if (char === inString) {
+          inString = null
+        }
+        pos++
+        continue
+      }
+
       if (char === '"' || char === "'" || char === '`') {
         inString = char
         pos++
         continue
       }
+
+      // Track brace depth
       if (char === '{') depth++
       if (char === '}') depth--
       pos++
     }
 
     if (depth !== 0) continue
-    const fullEnd = pos + 1
 
-    const jsBlock = text.slice(genStart, fullEnd)
-    const genBlock = jsToGen(jsBlock)
+    const closeBracePos = pos - 1
+    const closeParenPos = formattedCode.indexOf(')', closeBracePos)
 
-    const adjustedStart = genStart + offset
-    const adjustedEnd = fullEnd + offset
-    result = result.slice(0, adjustedStart) + genBlock + result.slice(adjustedEnd)
+    if (closeParenPos === -1) continue
 
-    offset += genBlock.length - (fullEnd - genStart)
+    const bodyContent = formattedCode.slice(openBracePos + 1, closeBracePos)
+
+    // Transform statements back to gen syntax
+    // Handles simple identifiers, array destructuring, and object destructuring
+    let transformedBody = bodyContent
+      .replace(/const\s+(\w+|\[[^\]]+\]|\{[^}]+\})\s*=\s*yield\s*\*\s*/g, '$1 <- ')
+      .replace(/yield\s*\*\s+/g, '_ <- ')
+
+    // Normalize indentation
+    const currentMinIndent = findMinIndent(transformedBody)
+    const targetIndent = baseIndent.length + 2
+
+    if (currentMinIndent > targetIndent) {
+      const excessIndent = currentMinIndent - targetIndent
+      transformedBody = dedent(transformedBody, excessIndent)
+    }
+
+    const trimmedBody = transformedBody.replace(/\s+$/, '')
+    const closingBraceIndent = trimmedBody.endsWith('\n') ? baseIndent : '\n' + baseIndent
+
+    const replacement = `gen {${trimmedBody}${closingBraceIndent}}`
+
+    replacements.push({
+      start: startPos,
+      end: closeParenPos + 1,
+      replacement
+    })
+  }
+
+  // Apply replacements from end to start to preserve positions
+  for (let i = replacements.length - 1; i >= 0; i--) {
+    const repl = replacements[i]!
+    result = result.slice(0, repl.start) + repl.replacement + result.slice(repl.end)
   }
 
   return result
+}
+
+/**
+ * Normalize multi-line bind statements to single lines
+ */
+function normalizeBindStatements(source: string): string {
+  const multiLineBindPattern = /^(\s*)(\w+|\[[\w\s,.\[\]{}:]+\]|\{[\w\s,.:]+\})\s*<-\s*\n\s*/gm
+  return source.replace(multiLineBindPattern, '$1$2 <- ')
 }
 
 /**
@@ -123,7 +295,6 @@ function findGenBlocks(text: string): GenBlockRange[] {
     const start = match.index
     const braceStart = text.indexOf('{', start)
 
-    // Find matching closing brace
     let depth = 1
     let pos = braceStart + 1
     let inString: string | null = null
@@ -131,7 +302,6 @@ function findGenBlocks(text: string): GenBlockRange[] {
     while (pos < text.length && depth > 0) {
       const char = text[pos]
 
-      // Handle strings
       if (inString) {
         if (char === inString && text[pos - 1] !== '\\') {
           inString = null
@@ -183,8 +353,6 @@ function filterDiagnostics(
   return diagnostics.filter((diagnostic) => {
     const startOffset = document.offsetAt(diagnostic.range.start)
     const endOffset = document.offsetAt(diagnostic.range.end)
-
-    // Keep diagnostic if it's not inside a gen block
     return !isInGenBlock(startOffset, genBlocks) && !isInGenBlock(endOffset, genBlocks)
   })
 }
@@ -195,120 +363,128 @@ export function activate(context: vscode.ExtensionContext) {
   const config = vscode.workspace.getConfiguration('effectSugar')
   const suppressDiagnostics = config.get<boolean>('suppressDiagnostics', true)
 
-  if (!suppressDiagnostics) {
-    return
+  if (suppressDiagnostics) {
+    // Create our own diagnostic collection
+    const filteredDiagnostics = vscode.languages.createDiagnosticCollection('effect-sugar-filtered')
+    context.subscriptions.push(filteredDiagnostics)
+
+    const tsDiagnosticSources = ['ts', 'typescript']
+
+    const disposable = vscode.languages.onDidChangeDiagnostics((event) => {
+      for (const uri of event.uris) {
+        const document = vscode.workspace.textDocuments.find(
+          (doc) => doc.uri.toString() === uri.toString()
+        )
+
+        if (!document) continue
+
+        if (!['typescript', 'typescriptreact'].includes(document.languageId)) {
+          continue
+        }
+
+        const allDiagnostics = vscode.languages.getDiagnostics(uri)
+
+        const tsDiagnostics = allDiagnostics.filter(
+          (d) => d.source && tsDiagnosticSources.includes(d.source.toLowerCase())
+        )
+
+        if (tsDiagnostics.length > 0) {
+          const filtered = filterDiagnostics(document, tsDiagnostics)
+
+          if (filtered.length < tsDiagnostics.length) {
+            console.log(
+              `Effect Sugar: Suppressed ${tsDiagnostics.length - filtered.length} diagnostics in gen blocks`
+            )
+          }
+        }
+      }
+    })
+
+    context.subscriptions.push(disposable)
+
+    // Register a code action provider
+    const codeActionProvider = vscode.languages.registerCodeActionsProvider(
+      ['typescript', 'typescriptreact'],
+      {
+        provideCodeActions(document, range, context) {
+          const text = document.getText()
+          const genBlocks = findGenBlocks(text)
+          const offset = document.offsetAt(range.start)
+
+          if (isInGenBlock(offset, genBlocks)) {
+            const action = new vscode.CodeAction(
+              'This code is inside a gen block - errors are expected until transformation',
+              vscode.CodeActionKind.QuickFix
+            )
+            action.diagnostics = [...context.diagnostics]
+            action.isPreferred = false
+            return [action]
+          }
+
+          return []
+        }
+      }
+    )
+
+    context.subscriptions.push(codeActionProvider)
   }
 
-  // Create our own diagnostic collection
-  const filteredDiagnostics = vscode.languages.createDiagnosticCollection('effect-sugar-filtered')
-  context.subscriptions.push(filteredDiagnostics)
-
-  // Track TypeScript diagnostic collections
-  const tsDiagnosticSources = ['ts', 'typescript']
-
-  // Listen for diagnostic changes
-  const disposable = vscode.languages.onDidChangeDiagnostics((event) => {
-    for (const uri of event.uris) {
-      const document = vscode.workspace.textDocuments.find(
-        (doc) => doc.uri.toString() === uri.toString()
-      )
-
-      if (!document) continue
-
-      // Only process TypeScript files
-      if (!['typescript', 'typescriptreact'].includes(document.languageId)) {
-        continue
-      }
-
-      // Get all diagnostics for this file
-      const allDiagnostics = vscode.languages.getDiagnostics(uri)
-
-      // Filter out TypeScript diagnostics inside gen blocks
-      const tsDiagnostics = allDiagnostics.filter(
-        (d) => d.source && tsDiagnosticSources.includes(d.source.toLowerCase())
-      )
-
-      if (tsDiagnostics.length > 0) {
-        const filtered = filterDiagnostics(document, tsDiagnostics)
-
-        // If we filtered any diagnostics, we need to suppress the originals
-        // This is tricky - VSCode doesn't allow us to remove diagnostics from other sources
-        // The best we can do is show our own filtered collection
-        if (filtered.length < tsDiagnostics.length) {
-          // Log that we're suppressing diagnostics
-          console.log(
-            `Effect Sugar: Suppressed ${tsDiagnostics.length - filtered.length} diagnostics in gen blocks`
-          )
-        }
-      }
-    }
-  })
-
-  context.subscriptions.push(disposable)
-
-  // Register a code action provider to help users understand suppressed errors
-  const codeActionProvider = vscode.languages.registerCodeActionsProvider(
-    ['typescript', 'typescriptreact'],
-    {
-      provideCodeActions(document, range, context) {
-        const text = document.getText()
-        const genBlocks = findGenBlocks(text)
-        const offset = document.offsetAt(range.start)
-
-        if (isInGenBlock(offset, genBlocks)) {
-          const action = new vscode.CodeAction(
-            'This code is inside a gen block - errors are expected until transformation',
-            vscode.CodeActionKind.QuickFix
-          )
-          action.diagnostics = [...context.diagnostics]
-          action.isPreferred = false
-          return [action]
-        }
-
-        return []
-      }
-    }
-  )
-
-  context.subscriptions.push(codeActionProvider)
-
-  // Register document formatting provider
+  // Register document formatting provider for gen block support
   const formattingProvider = vscode.languages.registerDocumentFormattingEditProvider(
     ['typescript', 'typescriptreact'],
     {
       async provideDocumentFormattingEdits(
         document: vscode.TextDocument
       ): Promise<vscode.TextEdit[]> {
-        const text = document.getText()
-        const genBlocks = findGenBlocks(text)
-
-        // If no gen blocks, let default formatter handle it
-        if (genBlocks.length === 0) {
-          return []
-        }
+        console.log('Effect Sugar: formatting', document.fileName)
+        let text = document.getText()
+        const originalText = text
 
         try {
-          // Transform gen blocks to valid JS
-          const jsCode = transformGenBlocksToJs(text, genBlocks)
+          // Load prettier from workspace
+          const prettier = await loadPrettier(document.fileName)
 
-          // Format with Prettier
-          const formatted = await prettier.format(jsCode, {
-            parser: 'typescript',
-            semi: true,
-            singleQuote: false,
-            trailingComma: 'es5'
-          })
+          // Resolve Prettier config for this file
+          const prettierConfig = (await prettier.resolveConfig(document.fileName)) || {}
 
-          // Transform back to gen syntax
-          const restored = transformJsToGenBlocks(formatted)
+          let formatted: string
+
+          // Check if file has gen blocks using effect-sugar-core
+          if (hasGenBlocks(text)) {
+            // Normalize multi-line bind statements
+            text = normalizeBindStatements(text)
+
+            // Transform gen blocks to Effect.gen() using effect-sugar-core
+            const transformed = transformSource(text, document.fileName)
+
+            // Format with Prettier
+            const prettierFormatted = await prettier.format(transformed.code, {
+              ...prettierConfig,
+              filepath: document.fileName
+            })
+
+            // Transform back to gen syntax
+            formatted = transformBack(prettierFormatted)
+          } else {
+            // No gen blocks - just format with Prettier directly
+            formatted = await prettier.format(text, {
+              ...prettierConfig,
+              filepath: document.fileName
+            })
+          }
+
+          // Only return edit if content changed
+          if (formatted === originalText) {
+            return []
+          }
 
           // Return edit replacing entire document
           const fullRange = new vscode.Range(
             document.positionAt(0),
-            document.positionAt(text.length)
+            document.positionAt(originalText.length)
           )
 
-          return [vscode.TextEdit.replace(fullRange, restored)]
+          return [vscode.TextEdit.replace(fullRange, formatted)]
         } catch (error) {
           console.error('Effect Sugar formatting error:', error)
           vscode.window.showErrorMessage(`Effect Sugar formatting failed: ${error}`)
@@ -319,6 +495,25 @@ export function activate(context: vscode.ExtensionContext) {
   )
 
   context.subscriptions.push(formattingProvider)
+
+  // Show info message about formatter
+  const hasShownInfo = context.globalState.get<boolean>('effectSugar.formatterInfoShown')
+  if (!hasShownInfo) {
+    vscode.window
+      .showInformationMessage(
+        'Effect Sugar: To use gen block formatting, set "Effect Sugar" as your default TypeScript formatter.',
+        'Open Settings'
+      )
+      .then((selection) => {
+        if (selection === 'Open Settings') {
+          vscode.commands.executeCommand(
+            'workbench.action.openSettings',
+            'editor.defaultFormatter'
+          )
+        }
+      })
+    context.globalState.update('effectSugar.formatterInfoShown', true)
+  }
 }
 
 export function deactivate() {
