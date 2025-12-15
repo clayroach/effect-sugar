@@ -1,7 +1,7 @@
 {
   "name": "effect-sugar",
   "displayName": "Effect Sugar",
-  "description": "Syntax highlighting and TypeScript support for Effect-TS gen blocks",
+  "description": "Syntax highlighting, TypeScript support, and Prettier formatting for Effect-TS gen blocks",
   "version": "0.1.0",
   "private": true,
   "publisher": "atrim",
@@ -13,13 +13,14 @@
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Formatters"
   ],
   "activationEvents": [
     "onLanguage:typescript",
     "onLanguage:typescriptreact"
   ],
-  "main": "./target/src/extension.js",
+  "main": "./dist/extension.js",
   "typescriptServerPlugins": [
     {
       "name": "effect-sugar-ts-plugin",
@@ -69,16 +70,17 @@
     }
   },
   "scripts": {
-    "build": "cd ts-plugin && pnpm build && cd .. && tsc -p ./",
-    "postcompile": "echo 'Postcompile deprecated - use build script'",
-    "dev": "tsc -watch -p ./",
+    "build": "cd ts-plugin && pnpm build && cd .. && node esbuild.js",
+    "build:production": "cd ts-plugin && pnpm build && cd .. && node esbuild.js --production",
+    "dev": "node esbuild.js --watch",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf target ../../examples/node_modules/effect-sugar-ts-plugin",
-    "vscode:prepublish": "pnpm run build",
+    "clean": "rm -rf dist ../../examples/node_modules/effect-sugar-ts-plugin",
+    "vscode:prepublish": "pnpm run build:production",
     "package": "mkdir -p ../../target && vsce package --out ../../target/ --no-dependencies",
     "install-extension": "code --install-extension ../../target/effect-sugar-0.1.0.vsix"
   },
   "dependencies": {
+    "effect-sugar-core": "workspace:*",
     "effect-sugar-ts-plugin": "workspace:*",
     "magic-string": "^0.30.5",
     "prettier": "^3.0.0"
@@ -87,6 +89,7 @@
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^2.22.0",
+    "esbuild": "^0.27.0",
     "typescript": "^5.3.0"
   }
 }

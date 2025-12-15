@@ -1,0 +1,24 @@
+.vscode/**
+.vscode-test/**
+src/**
+.turbo/**
+*.ts
+!dist/**
+esbuild.js
+tsconfig.json
+pnpm-lock.yaml
+.gitignore
+
+# Include prettier from node_modules (not bundled due to createRequire issues)
+node_modules/**
+!node_modules/prettier/**
+
+# Keep ts-plugin for TypeScript language service
+!ts-plugin/dist/**
+ts-plugin/src/**
+ts-plugin/test/**
+ts-plugin/node_modules/**
+ts-plugin/.turbo/**
+ts-plugin/tsconfig.json
+ts-plugin/vitest.config.ts
+ts-plugin/ts-plugin/**

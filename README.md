@@ -2,62 +2,35 @@
 
 Syntactic sugar for [Effect-TS](https://effect.website/) with for-comprehension style `gen` blocks.
 
-## Example: Racing Multiple Data Sources
-
 ```typescript
-import { Effect, Race } from "effect"
-
 // Write this:
-const fetchUserProfile = (userId: string) => gen {
-  // Race between cache and API
-  cached <- Effect.promise(() => cache.get(userId))
-  [profile, stats] <- Race.race(
-    fetchFromPrimary(userId),
-    fetchFromBackup(userId)
-  )
-
-  // Validate and enrich
-  _ <- validateProfile(profile)
-  enriched <- enrichWithStats(profile, stats)
-
-  // Cache the result
-  _ <- Effect.promise(() => cache.set(userId, enriched))
-
-  return enriched
+const fetchUser = (id: string) => gen {
+  user <- getUser(id)
+  profile <- getProfile(user.id)
+  return { user, profile }
 }
 
-// Instead of this:
-const fetchUserProfile = (userId: string) =>
+// Instead of:
+const fetchUser = (id: string) =>
   Effect.gen(function* () {
-    const cached = yield* Effect.promise(() => cache.get(userId))
-    const [profile, stats] = yield* Race.race(
-      fetchFromPrimary(userId),
-      fetchFromBackup(userId)
-    )
-
-    yield* validateProfile(profile)
-    const enriched = yield* enrichWithStats(profile, stats)
-    yield* Effect.promise(() => cache.set(userId, enriched))
-
-    return enriched
+    const user = yield* getUser(id)
+    const profile = yield* getProfile(user.id)
+    return { user, profile }
   })
 ```
 
-## Quick Start
+## Installation
 
-### TypeScript Compiler (Recommended)
-
-For projects using standard TypeScript compilation with tsc.
+### 1. Install packages
 
 ```bash
 pnpm add -D effect-sugar-tsc ts-patch
 ```
 
-## Installation Options
+### 2. Configure TypeScript
 
-### TypeScript Compiler (tsc via ts-patch)
+**tsconfig.json** (for IDE support):
 
-**1. Create `tsconfig.json`** for IDE support:
 ```json
 {
   "compilerOptions": {
@@ -68,7 +41,8 @@ pnpm add -D effect-sugar-tsc ts-patch
 }
 ```
 
-**2. Create `tsconfig.build.json`** for compilation:
+**tsconfig.build.json** (for compilation):
+
 ```json
 {
   "extends": "./tsconfig.json",
@@ -84,7 +58,8 @@ pnpm add -D effect-sugar-tsc ts-patch
 }
 ```
 
-**3. Add build scripts** to `package.json`:
+### 3. Add scripts to package.json
+
 ```json
 {
   "scripts": {
@@ -94,81 +69,46 @@ pnpm add -D effect-sugar-tsc ts-patch
 }
 ```
 
-**4. Install and build:**
+### 4. Install and build
+
 ```bash
 pnpm install
 pnpm build
 ```
 
-**Why separate configs?** The compilation transformer operates during TypeScript's program transformation phase, while the IDE plugin works at the language service level. Using separate configs ensures optimal performance and stability in both contexts.
+## VSCode Extension
 
-### Vite Plugin
+Install the Effect Sugar VSCode extension for the best experience:
 
-For Vite projects:
-
-```bash
-pnpm add -D effect-sugar-vite esbuild
-```
-
-Configure in `vite.config.ts`:
-```typescript
-import { defineConfig } from 'vite'
-import effectSugar from 'effect-sugar-vite'
-
-export default defineConfig({
-  plugins: [effectSugar()]
-})
-```
-
-Add to `tsconfig.json` for IDE support:
-```json
-{
-  "compilerOptions": {
-    "plugins": [
-      { "name": "effect-sugar-ts-plugin" }
-    ]
-  }
-}
-```
-
-## IDE Support (VSCode Recommended)
-
-### VSCode Extension (Recommended)
-
-For the best developer experience, install the VSCode extension:
-
-1. Download from the [releases page](https://github.com/clayroach/effect-sugar/releases)
+1. Download from [releases](https://github.com/clayroach/effect-sugar/releases)
 2. Install: `code --install-extension effect-sugar-x.x.x.vsix`
 
 The extension provides:
-- ✅ Syntax highlighting for gen blocks
-- ✅ IntelliSense (hover, go-to-definition, autocomplete)
-- ✅ Suppresses TypeScript errors inside gen blocks
 
-### Other Editors (TypeScript Plugin)
+- Syntax highlighting for gen blocks
+- IntelliSense (hover, go-to-definition, autocomplete)
+- **Prettier formatting** that preserves gen block syntax
 
-For editors other than VSCode (WebStorm, Vim, etc.), add the TypeScript language service plugin:
+### Configure as Default Formatter
+
+Add to `.vscode/settings.json`:
 
 ```json
 {
-  "compilerOptions": {
-    "plugins": [
-      {
-        "name": "effect-sugar-tsc",
-        "transform": "effect-sugar-tsc/transform",
-        "transformProgram": true
-      },
-      { "name": "effect-sugar-vscode/ts-plugin" }
-    ]
+  "[typescript]": {
+    "editor.defaultFormatter": "atrim.effect-sugar"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "atrim.effect-sugar"
   }
 }
 ```
 
-Then restart your editor's TypeScript server.
+The extension uses your workspace's prettier installation and `.prettierrc` config.
 
 ## ESLint Integration
 
-Transform gen blocks before linting to prevent syntax errors:
+Transform gen blocks before linting:
 
 ```javascript
 // eslint.config.mjs
@@ -178,62 +118,29 @@ export default [
   {
     files: ['**/*.ts', '**/*.tsx'],
     processor: effectSugarPreprocessor,
-    // ... your other config
   }
 ]
 ```
 
-## Prettier Integration
+## Syntax Reference
 
-Format gen block code with Prettier using the `effect-sugar-format` CLI tool:
-
-```bash
-# Format specific files
-npx effect-sugar-format src/**/*.ts
-
-# Format directories
-npx effect-sugar-format src/ test/
-
-# Add to package.json scripts
-{
-  "scripts": {
-    "format": "effect-sugar-format src/"
-  }
-}
-```
-
-The CLI tool:
-1. Transforms `gen {}` → `Effect.gen()` before formatting
-2. Runs Prettier with your project's configuration
-3. Transforms back to `gen {}` syntax
-
-**Note:** The formatter requires `prettier` as a peer dependency. Install it with:
-
-```bash
-pnpm add -D prettier
-```
+| Input | Output | Description |
+|-------|--------|-------------|
+| `x <- effect` | `const x = yield* effect` | Bind effect result to variable |
+| `_ <- effect` | `yield* effect` | Execute effect, discard result |
+| `let x = expr` | `const x = expr` | Local variable binding |
+| `return expr` | `return expr` | Return value |
+| `return _ <- effect` | `return yield* effect` | Early return (for type narrowing) |
 
 ## Alternative Setups
 
-The recommended setup above works for most projects. For specific build tools or use cases:
+- **[Vite Plugin](./docs/setup/vite.md)** - For existing Vite projects
+- **[esbuild](./docs/setup/esbuild.md)** - For production bundling
+- **[tsx runtime](./docs/setup/tsx-runtime.md)** - For Docker development
 
-- **[esbuild bundling](./docs/setup/esbuild.md)** - For production builds with esbuild, tsup, or unbuild
-- **[tsx runtime with hot reload](./docs/setup/tsx-runtime.md)** - For Docker development environments
-- **[Vite](./docs/setup/vite.md)** - ⚠️ Deprecated, for existing projects only
+## Examples
 
-See the [setup guides](./docs/setup/) for more options.
-
-## Syntax Reference
-
-| Input | Output | Notes |
-|-------|--------|-------|
-| `x <- effect` | `const x = yield* effect` | Bind pattern |
-| `_ <- effect` | `yield* effect` | Discard pattern (no binding) |
-| `let x = expr` | `const x = expr` | Let binding |
-| `return expr` | `return expr` | Return value |
-| `return _ <- effect` | `return yield* effect` | Early return (required for type narrowing) |
-
-## Example: Racing Multiple Data Sources
+### Racing Multiple Data Sources
 
 Fetch data from multiple sources simultaneously and use the first to respond:
 
@@ -312,9 +219,10 @@ const fetchProduct = (productId: string) =>
     return { product: formatted, source: data.source, metadata }
   })
 ```
+
 </details>
 
-## Example: Parallel Operations
+### Parallel Operations
 
 Execute multiple independent operations concurrently with `Effect.all`:
 
@@ -349,23 +257,6 @@ const fetchDashboard = (userId: string) => gen {
   return { user, profile, stats, notifications }
 }
 ```
-
-## Development
-
-```bash
-pnpm install
-pnpm run build      # Build all packages
-pnpm test           # Run tests
-pnpm test:integration
-```
-
-## Project Structure
-
-- `packages/core/` - Core scanner and transformer (`effect-sugar-core`)
-- `packages/tsc-plugin/` - ts-patch transformer for tsc (`effect-sugar-tsc`)
-- `packages/esbuild-plugin/` - esbuild plugin (`effect-sugar-esbuild`)
-- `packages/vscode-extension/` - VSCode extension with bundled TS plugin
-- `packages/vite-plugin/` - ⚠️ Deprecated - Vite plugin (`effect-sugar-vite`)
 
 ## License
 
