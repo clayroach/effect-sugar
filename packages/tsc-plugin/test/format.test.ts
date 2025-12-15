@@ -275,6 +275,36 @@ const b = gen {
 
         expect(transformBack(input)).toBe(expected)
       })
+
+      it('should handle array destructuring patterns', () => {
+        // [config, llmConfig] <- Effect.all([...])
+        const input = `Effect.gen(/* __EFFECT_SUGAR__ */ function* () {
+  const [config, llmConfig] = yield* Effect.all([loadConfig(), loadLLMConfig()]);
+  return { config, llmConfig };
+})`
+
+        const expected = `gen {
+  [config, llmConfig] <- Effect.all([loadConfig(), loadLLMConfig()]);
+  return { config, llmConfig };
+}`
+
+        expect(transformBack(input)).toBe(expected)
+      })
+
+      it('should handle object destructuring patterns', () => {
+        // {name, age} <- getUser()
+        const input = `Effect.gen(/* __EFFECT_SUGAR__ */ function* () {
+  const { name, age } = yield* getUser();
+  return \`\${name} is \${age}\`;
+})`
+
+        const expected = `gen {
+  { name, age } <- getUser();
+  return \`\${name} is \${age}\`;
+}`
+
+        expect(transformBack(input)).toBe(expected)
+      })
     })
   })
 

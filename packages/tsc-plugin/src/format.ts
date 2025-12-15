@@ -289,7 +289,8 @@ export function transformBack(formattedCode: string): string {
     // Transform statements back to gen syntax
     let transformedBody = bodyContent
       // const x = yield* expr → x <- expr
-      .replace(/const\s+(\w+)\s*=\s*yield\s*\*\s*/g, '$1 <- ')
+      // Handles simple identifiers, array destructuring, and object destructuring
+      .replace(/const\s+(\w+|\[[^\]]+\]|\{[^}]+\})\s*=\s*yield\s*\*\s*/g, '$1 <- ')
       // yield* expr (without assignment) → _ <- expr
       .replace(/yield\s*\*\s+/g, '_ <- ')
 
