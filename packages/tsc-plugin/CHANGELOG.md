@@ -1,5 +1,11 @@
 # effect-sugar-tsc
 
+## 0.3.1
+
+### Patch Changes
+
+- 70a85d7: add --check flag to effect-sugar-format CLI
+
 ## 0.3.0
 
 ### Minor Changes
