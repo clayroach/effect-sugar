@@ -4,7 +4,7 @@
   "description": "Syntax highlighting, TypeScript support, and Prettier formatting for Effect-TS gen blocks",
   "version": "0.1.0",
   "private": true,
-  "publisher": "atrim",
+  "publisher": "clayroach",
   "repository": {
     "type": "git",
     "url": "https://github.com/clayroach/effect-sugar"

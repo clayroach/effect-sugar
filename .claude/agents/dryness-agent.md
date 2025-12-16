@@ -251,7 +251,7 @@ jobs:
             }
 ```
 
-## Custom Rules for atrim
+## Custom Rules for Effect-TS Projects
 
 ### Effect-TS Specific Patterns
 ```yaml

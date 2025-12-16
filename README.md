@@ -96,10 +96,10 @@ Add to `.vscode/settings.json`:
 ```json
 {
   "[typescript]": {
-    "editor.defaultFormatter": "atrim.effect-sugar"
+    "editor.defaultFormatter": "clayroach.effect-sugar"
   },
   "[typescriptreact]": {
-    "editor.defaultFormatter": "atrim.effect-sugar"
+    "editor.defaultFormatter": "clayroach.effect-sugar"
   }
 }
 ```

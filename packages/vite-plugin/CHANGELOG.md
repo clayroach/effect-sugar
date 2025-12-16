@@ -82,4 +82,4 @@
 
 ### Minor Changes
 
-- 34d1be3: vite plugin working with atrim2
+- 34d1be3: vite plugin working with real projects

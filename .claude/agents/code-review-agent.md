@@ -190,7 +190,7 @@ const result = yield* client.query(...)
 ### ✅ CORRECT: Service Abstraction Usage
 ```typescript
 // CORRECT: Import from storage package (NOT flagged)
-import { ClickhouseClient } from '@atrim/storage'
+import { ClickhouseClient } from '@myapp/storage'
 import { StorageServiceTag } from '../storage/services.js'
 
 // CORRECT: Use service methods instead of raw SQL
@@ -223,7 +223,7 @@ function processData(client: ClickhouseClient) {
 - Bypassing StorageServiceTag: using database clients instead of service methods
 
 **DO NOT flag:**
-- `import { ClickhouseClient } from '@atrim/storage'` (correct pattern)
+- `import { ClickhouseClient } from '@myapp/storage'` (correct pattern)
 - `import { ClickhouseClient } from '../storage'` (correct relative imports)
 - `ClickhouseClient` type annotations when importing from storage packages
 
